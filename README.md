@@ -10,7 +10,7 @@
 |---|---|---|---|
 | Nguyễn Anh Tuấn | 2A202602700 | Teamlead |  |
 | Đặng Quang Hưng | 2A202602719 |  |  |
-| Nguyễn Hữu Thành | 2A202602813 |  |  |
+| Nguyễn Hữu Thành | 2A202602813 | Member | AI Engineer | Track AI và dữ liệu
 | Hà Thị Mỹ Linh | 2A202602619 |  |  |
 
 > Nhóm copy nguyên file README này về repo của mình, rồi điền bảng trên. Cột **Phần việc đảm nhiệm** ghi càng cụ thể càng tốt.
