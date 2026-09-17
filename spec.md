@@ -1,161 +1,159 @@
-# AI SPEC — Adaptive Quiz Feedback D2 · Nhóm Enigma · Zone C3
+# AI SPEC — Personalized Quiz Feedback D2 · Nhóm Enigma · Zone C3
 Hướng: [x] D — Học tập thích ứng & tương tác trên VLearn
 Loại: [x] Tính năng mới
 
 ## §1. User & Job
 - Job executor + workflow:
-  - Job executor: Học viên K4 đang làm quiz/lab theo buổi trên VLearn.
-  - Workflow hiện tại: xem nội dung -> làm quiz/lab -> sai -> đọc phản hồi -> thử lại.
-  - Điểm nghẽn: phản hồi thường chung, chưa chỉ ra sai ở giả định nào nên học viên thử lại theo cảm tính.
+  - Job executor: Học viên K4 đang làm quiz/lab trên VLearn, trong đó mỗi người đến từ các bối cảnh nghề nghiệp khác nhau.
+  - Workflow hiện tại: xem nội dung -> làm quiz/lab -> trả lời sai -> đọc phản hồi chung -> thử lại theo cảm tính.
+  - Điểm nghẽn: cùng một khái niệm được giảng dạy trong buổi học nhưng câu hỏi và phản hồi chưa được điều chỉnh theo profile của người học. Học viên từ Data/AI, IT/Dev và Non-IT sẽ hiểu cùng một câu hỏi với mức độ liên hệ và ví dụ khác nhau.
 - Core JTBD (không tên sản phẩm/AI trong câu):
-  - Khi tôi làm sai một câu trong lúc học, tôi muốn biết ngay tôi sai ở đâu và bước sửa tiếp theo là gì, để kịp sửa đúng trước hạn nộp.
+  - Khi tôi làm quiz hoặc lab và không chắc về kiến thức, tôi muốn nhận được câu hỏi, gợi ý và giải thích phù hợp với nền tảng nghề nghiệp của mình, để hiểu đúng bản chất của khái niệm và cải thiện lần làm tiếp theo.
 - Problem statement (khong dung chu AI):
-  - Phản hồi sau câu trả lời sai chưa chẩn đoán được lỗi hiểu bài ở cấp cá nhân, dẫn đến việc học viên thử lại nhiều vòng nhưng vẫn chưa biết nên sửa kiến thức nào trước.
+  - Hệ thống hiện tại đưa ra phản hồi chung cho mọi học viên dù họ đến từ các profile khác nhau, khiến học viên khó kết nối khái niệm với bối cảnh công việc thực tế của mình. Kết quả là học viên sai lặp lại nhiều lần vì không hiểu đúng giả định mà câu hỏi đang kiểm tra.
 - Evidence (chuẩn B mining, bổ sung chuẩn A sau):
-  - Số liệu mining:
-    - Trên toàn bộ chatlog `tutor_turns.csv`, trường `understanding_level` chỉ có 20/13.494 lượt.
-    - `move_used=ask_probing_question` chỉ 28/13.494 lượt.
-    - Nguồn: data dictionary của vlearn-pack.
-  - 5 ví dụ nguyên văn K4 + nguồn:
-    - `T10317`: học viên nói "giải thích lại dc không hơi khó hiểu", phản hồi chưa bám được nội dung cụ thể do thiếu ngữ cảnh tài liệu.
-    - `T10318`: học viên nói "đây", phản hồi tiếp tục yêu cầu mở lại tài liệu, chưa chẩn đoán lỗi hiểu bài.
-    - `T10326`: học viên nói "Giải thích lại giúp mình phần mà mình hay thấy khó", hệ thống hỏi lại chung, chưa có cơ chế tìm lỗi điển hình theo lịch sử sai.
-    - `T10484`: học viên yêu cầu tóm tắt video, phản hồi thừa nhận không truy cập được nội dung video và trả lời tổng quát.
-    - `T10291`: học viên hỏi nên ôn phần nào theo tiến độ, phản hồi mới dừng ở định hướng chung.
-    - Nguồn: `data/vlearn-pack/chatlog/tutor_turns.csv` (các turn_id nêu trên).
-  - Phương pháp đếm kiểm lại được:
-    - Lọc cột `move_used`, `understanding_level` theo định nghĩa trong `DATA_DICTIONARY.md`.
-    - Truy vết từng turn qua `turn_id` trong `tutor_turns.csv`.
-  - Khảo sát/pv (se bo sung truoc CP4):
-    - Mục tiêu: n >= 20 học viên ngoài nhóm, ghi full log câu hỏi/câu trả lời.
+  - Dữ liệu hiện có cho thấy trong chatlog và nội dung quiz, phản hồi thường có tính tổng quát, không phản ánh sự đa dạng của học viên theo nghề nghiệp hoặc bối cảnh áp dụng.
+  - 3 nhóm profile chính cần cân nhắc:
+    - Data/AI: quen với khái niệm dữ liệu, thống kê, mô hình, pipeline, độ tin cậy.
+    - IT/Dev: quen với coding, hệ thống, logic, API, architecture.
+    - Non-IT: quen với quy trình, business, workflow, hiểu biết ứng dụng kinh doanh hơn là kỹ thuật sâu.
+  - Sự khác biệt này ảnh hưởng trực tiếp đến cách đặt câu hỏi và cách sinh feedback:
+    - Cùng một kiến thức “tokenization”, câu hỏi cho Data/AI có thể liên quan đến “đọc dữ liệu, preprocessing, embedding”.
+    - Cùng kiến thức đó, câu hỏi cho IT/Dev có thể liên quan đến “string processing, API payload / parsing logic”.
+    - Với Non-IT, câu hỏi nên tập trung vào “ý nghĩa thực tiễn, ví dụ trong workflow công việc, không quá chuyên sâu về kỹ thuật”.
+  - Khảo sát/pv (sẽ bổ sung trước CP4):
+    - Mục tiêu: n >= 20 học viên, thu thập profile nghề nghiệp, cách họ hiểu 1-2 câu hỏi tương tự, mức độ phù hợp của phản hồi hiện tại.
 
 ## §2. Impact & quyết định chọn
 - Bảng impact (3 ứng viên):
 
 | Ứng viên pain | Bao nhiêu người bị ảnh hưởng | Tần suất | Tốn gì mỗi lần | Khả thi 30h |
 |---|---:|---:|---|---|
-| A. Sai nhưng phản hồi chung, không chỉ rõ lỗi | Cao (đa số người làm quiz/lab) | Cao ở giờ lab/quiz | 3-10 phút/lượt thử lại + tăng nản | Cao |
-| B. Hỏi logistics (nộp gì, deadline) nhưng không có câu trả lời dứt điểm | Trung bình đến cao | Trung bình, tăng mạnh gần hạn nộp | 2-7 phút/lượt + chuyển kênh hỏi | Cao |
-| C. Không tóm tắt được video/không lấy được nội dung một số học phần | Trung bình | Trung bình | 3-8 phút/lượt tự mò lại nội dung | Trung bình |
+| A. Học viên làm sai nhưng nhận feedback không phù hợp với profile của mình | Cao, vì K4 có học viên từ nhiều ngành | Cao ở quiz/lab | 3-10 phút/lượt thử lại + cảm giác “đề không phù hợp” | Cao |
+| B. Học viên thấy câu hỏi quá kỹ thuật hoặc quá business so với background của mình | Cao ở 3 nhóm profile | Trung bình đến cao | 2-8 phút/lượt + mất tập trung | Cao |
+| C. Học viên không biết phải dùng ví dụ nào để liên hệ với kiến thức khi profile khác biệt | Trung bình | Trung bình | 3-7 phút/lượt tự suy đoán | Trung bình |
 
 - Ứng viên đã loại + lý do:
-  - Loại B làm bài chính: dễ làm nhưng thiên về FAQ vận hành hơn là "học tập thích ứng" của Track D.
-  - Loại C làm bài chính: phụ thuộc chất lượng nguồn tài liệu/video ingestion, rủi ro kỹ thuật cao trong 30h.
+  - Loại B làm bài chính: nếu hệ thống chỉ hỏi lại đúng profile mà không giải thích được lỗi học tập thì chưa giải quyết triệt để core problem.
+  - Loại C làm bài chính: đây là vấn đề bổ trợ, nhưng không phải trọng tâm của D2.
 - Ứng viên chọn + vì sao:
-  - Chọn A vì đúng trọng tâm D2 (học từ lỗi trước), có bằng chứng từ log, đo được bằng chỉ số học tập sau phản hồi (khong chi chat accuracy).
+  - Chọn A vì đây là pain point trực tiếp của D2: học viên sai do không hiểu đúng khái niệm trong bối cảnh của mình. Việc cá nhân hóa câu hỏi và feedback theo profile sẽ khiến nội dung học phù hợp hơn, giảm sự mơ hồ, và tăng khả năng sửa sai ngay trên lần làm tiếp theo.
 
 ## §3. Giải pháp tương tự đã nghiên cứu
-- Duolingo-style hint ladder:
-  - Flow: sai -> hint mức 1 -> sai tiếp -> giải thích mức 2 -> câu kiểm tra lại.
+- Duolingo-style personalized hint ladder:
+  - Flow: sai -> gợi ý theo profile -> explain theo ví dụ liên quan -> hỏi lại phiên bản phù hợp với năng lực.
   - Đáng học: phản hồi theo bậc, không lộ đáp án ngay.
-  - Đáng né: feedback chung chung không neo vào lỗi cụ thể.
-  - Mình khác: bắt buộc kèm trích dẫn từ transcript/slide của bài đang học.
-- Khan Academy Khanmigo/Socratic tutoring pattern:
-  - Flow: hỏi gợi mở để học viên tự nói ra giả định.
-  - Đáng học: dùng câu hỏi ngược để xác minh hiểu thật.
-  - Đáng né: hội thoại dài nhưng không có tiêu chí dừng.
-  - Mình khác: có ngưỡng dừng rõ ràng và chuyển mức hỗ trợ theo số lần sai.
+  - Đáng né: nếu hint vẫn chung cho mọi learner.
+  - Mình khác: phải điều chỉnh ngôn ngữ, kiểu ví dụ và độ sâu kỹ thuật theo profile từng học viên.
+- Khan Academy / Socratic tutoring pattern:
+  - Flow: hỏi gợi mở để học viên tự suy luận.
+  - Đáng học: tạo câu hỏi kích thích suy nghĩ.
+  - Đáng né: hỏi quá dài, không có bối cảnh nghề nghiệp.
+  - Mình khác: dùng persona-aware scaffolding, tức là cùng một kiến thức nhưng đặt lại câu hỏi và ví dụ theo Data/AI, IT/Dev hoặc Non-IT.
 
 ## §4. Thiết kế
 - Lát cắt MỘT CÂU:
-  - Một học viên K4 làm sai 1 câu quiz về tokenization, hệ thống quyết định lỗi thuộc nhầm khái niệm nào từ đáp án sai và ngữ cảnh bài học, rồi trả 1 gợi ý ngắn kèm đoạn trích nguồn liên quan để học viên sửa đúng ở lần kế tiếp và giải thích lại được vì sao.
+  - Một học viên profile Data/AI làm sai câu về “tokenization”, hệ thống nhận ra câu hỏi đang quá tổng quát và cần chuyển sang dạng liên quan đến preprocessing dữ liệu, feature engineering hoặc embedding. Hệ thống trả lời bằng một gợi ý ngắn, dùng ví dụ từ pipeline dữ liệu, kèm một câu hỏi lặp lại ở mức độ tương ứng với profile đó.
+  - Với học viên profile IT/Dev, cùng một khái niệm được giải thích qua ví dụ về parsing string, API payload, validation logic.
+  - Với học viên profile Non-IT, cùng khái niệm được giải thích qua ví dụ business workflow, xử lý thông tin đầu vào, tránh quá chuyên sâu về code.
 - Non-goals:
-  - Không build hệ thống chấm điểm chính thức toàn khóa.
-  - Không cá nhân hóa theo hồ sơ nghề nghiệp/CV ở phiên bản này.
-  - Không thay thế toàn bộ tutor hiện có trên mọi loại câu hỏi.
-  - Không xử lý câu hỏi ngoài phạm vi học thuật (hành chính, chính sách nghỉ học).
+  - Không xây hệ thống toàn khóa cho mọi bài học và mọi loại câu hỏi.
+  - Không dự đoán hoàn toàn nghề nghiệp thực tế của học viên từ CV nếu không có dữ liệu đầy đủ.
+  - Không thay thế toàn bộ tutor hiện có trên VLearn.
+  - Không xử lý các câu hỏi hành chính, lịch học, nộp bài, điểm số.
 - Mức prototype nhắm tới: [ ] Sketch [ ] Mock [x] Working
-  - Thật: pipeline phân loại lỗi -> sinh hint theo bậc -> trích dẫn nguồn -> câu kiểm tra lại.
-  - Mock: dữ liệu profile sâu và dashboard giảng viên chỉ ở mức demo tĩnh.
+  - Thật: profile classifier -> contextualized question generation -> personalized hint -> source grounding -> retry question.
+  - Mock: dashboard giảng viên và profile mapping chỉ ở mức demo tĩnh.
 - Automation: [x] augment [x] conditional [ ] automate
-  - Lý do: cost-of-error cao nếu chẩn đoán sai lỗi học viên; cần điều kiện confidence và cơ chế fallback.
+  - Lý do: nếu xác định profile/độ phù hợp không chắc chắn, hệ thống phải hỏi lại hoặc yêu cầu xác nhận profile thay vì đoán mò.
 
 ### §4b. Nguyên tắc đã áp dụng (HAX/PAIR)
 
 | Nguyên tắc | Áp cụ thể vào đâu trong prototype |
 |---|---|
-| Disclosure rõ ràng | Mở đầu phản hồi nêu đây là gợi ý học tập, không phải điểm số chính thức |
-| Nêu giới hạn & nguồn sự thật | Mỗi phản hồi bắt buộc có trích đoạn nguồn; thiếu nguồn thì nói "chưa đủ căn cứ" |
-| Progressive disclosure | Hint 3 mức: gợi ý nhẹ -> chỉ lỗi giả định -> giải thích có ví dụ |
-| User control | Học viên chọn "gợi ý thêm" hoặc "cho câu tương tự" thay vì bị ép xem đáp án |
-| Recovery path | Nếu mô hình không chắc, chuyển sang câu hỏi làm rõ hoặc khuyến nghị xem đoạn cụ thể |
+| Disclosure rõ ràng | Mở đầu phản hồi nêu rõ đây là gợi ý cá nhân hóa theo profile của học viên, không phải đáp án chính thức |
+| Nêu giới hạn & nguồn sự thật | Mỗi phản hồi bắt buộc gắn với nội dung bài học và ví dụ có căn cứ; thiếu thứ đó thì fallback rõ ràng |
+| Progressive disclosure | Hint 3 mức: gợi ý nhẹ -> nhấn mạnh sai giả định -> giải thích theo profile và ví dụ cụ thể |
+| User control | Học viên có thể chọn “giải thích theo hướng Data/AI”, “theo hướng Dev”, hoặc “giải thích đơn giản hơn” |
+| Recovery path | Nếu không chắc chắn profile, hỏi một câu ngắn để xác định nhóm phù hợp hoặc đưa ví dụ khái quát hơn |
 
 ## §5. Kiểu lỗi — 4 lớp chỗ khó + kịch bản
 
 | ID | Lớp lỗi | Kịch bản lỗi | Hậu quả | Cách xử lý trong prototype |
 |---|---|---|---|---|
-| E1 | ① Nguồn sự thật | Hệ thống gợi ý không có trích dẫn từ transcript/slide | Học viên học sai nhưng tưởng đúng | Chặn trả lời, buộc fallback "chưa đủ căn cứ" |
-| E2 | ① Nguồn sự thật | Trích dẫn nhầm đoạn (cite đúng format nhưng sai nội dung) | Tăng nhầm lẫn | Kiểm tra lexical overlap giữa lỗi và đoạn trích |
-| E3 | ② Mơ hồ/thiếu thông tin | Câu trả lời của học viên quá ngắn (1-2 từ) | Chẩn đoán lỗi sai loại | Hỏi làm rõ 1 câu ngắn trước khi phân loại misconception |
-| E4 | ② Mơ hồ/thiếu thông tin | Bài toán có nhiều cách đúng | Bị chấm sai oan | Cho phép nhiều pattern đáp án đúng + yêu cầu học viên giải thích |
-| E5 | ③ Ngoài phạm vi/thẩm quyền | Học viên hỏi deadline, nộp bài, điểm | Trải nghiệm lệch mục tiêu D2 | Route sang thông điệp ngoài phạm vi + chỉ nơi kiểm tra |
-| E6 | ③ Ngoài phạm vi/thẩm quyền | User yêu cầu "cho đáp án luôn" | Mất mục tiêu học từ lỗi | Giữ ladder: chỉ mở đáp án đầy đủ sau >=2 vòng nỗ lực |
-| E7 | ④ Đặc thù domain học tập | Chẩn đoán sai misconception (ví dụ nhầm tokenization vs embedding) | Sửa sai kiến thức, mất niềm tin | Misconception bank có mô tả ranh giới rõ, kiểm thử riêng từng loại |
-| E8 | ④ Đặc thù domain học tập | Feedback quá dài, quá hàn lâm | Học viên bỏ cuộc | Giới hạn phản hồi theo template ngắn + câu hỏi kiểm tra lại |
+| E1 | ① Nguồn sự thật | Feedback không dựa trên bài học hoặc không phù hợp profile | Học viên hiểu sai càng sâu | Chặn phản hồi, yêu cầu dùng nguồn bài học và ví dụ tương ứng |
+| E2 | ① Nguồn sự thật | Cùng một câu hỏi bị gắn ví dụ sai cho profile | Học viên cảm thấy đề không hợp lý | Xác thực profile trước khi cấp câu hỏi mới |
+| E3 | ② Mơ hồ/thiếu thông tin | Học viên không rõ mình thuộc nhóm nào | Lỗi phân loại profile sai | Hỏi 1 câu ngắn để xác định profile hoặc mức độ quen thuộc |
+| E4 | ② Mơ hồ/thiếu thông tin | Cùng một khái niệm nhưng nhiều cách hiểu tùy bối cảnh | Chấm sai oan | Cho phép nhiều đáp án đúng theo từng profile, rồi yêu cầu giải thích ngắn |
+| E5 | ③ Ngoài phạm vi/thẩm quyền | Học viên hỏi deadline, điểm, thông tin cá nhân | Trải nghiệm lệch mục tiêu D2 | Route sang khu vực hành chính riêng |
+| E6 | ③ Ngoài phạm vi/thẩm quyền | Học viên yêu cầu “cho đáp án luôn” | Mất mục tiêu học từ lỗi | Giữ ladder: chỉ mở đáp án đầy đủ sau >=2 vòng nỗ lực |
+| E7 | ④ Đặc thù domain học tập | Câu hỏi dạng kỹ thuật quá sâu cho Non-IT hoặc quá business cho Data/AI | Người học mất niềm tin | Có bộ template theo từng profile và độ sâu tùy nhóm |
+| E8 | ④ Đặc thù domain học tập | Feedback quá dài, nhiều khái niệm không liên quan | Học viên bỏ cuộc | Giới hạn phản hồi 2-3 câu + 1 câu kiểm tra lại |
 
 ## §6. Bốn đường đi của trải nghiệm
 - Happy path:
-  - Học viên trả lời sai -> hệ thống nhận diện đúng misconception -> đưa hint mức 1 + trích dẫn -> học viên sửa đúng ở lượt sau.
+  - Học viên làm sai -> hệ thống xác định profile -> tạo lại câu hỏi hoặc hint theo profile -> học viên hiểu đúng ở lần quay lại.
 - Low-confidence (②):
-  - Hệ thống không chắc lỗi thuộc nhóm nào -> hỏi 1 câu làm rõ -> mới chọn hint.
+  - Không chắc học viên thuộc nhóm nào -> hỏi 1 câu ngắn để xác định profile trước khi cho feedback.
 - Failure/không căn cứ (①):
-  - Không tìm được đoạn nguồn đủ liên quan -> nói rõ chưa đủ căn cứ + gợi ý mở lại đúng phần bài.
+  - Không đủ dữ liệu hoặc không tìm thấy phần nội dung tương ứng -> nói rõ “chưa đủ căn cứ” và gợi ý xem lại bài học trước khi làm lại.
 - Correction (user sửa):
-  - Học viên báo "vẫn chưa hiểu" -> tăng mức hỗ trợ từ hint sang explain, giữ cùng một concept.
+  - Học viên báo “vẫn chưa hiểu” -> tăng mức hỗ trợ từ hint sang explain theo cùng profile, không đổi sang cách giải thích khác nhóm.
 - Khi bị đòi ngoài phạm vi (③):
-  - Hỏi hành chính/điểm số chính thức -> từ chối lịch sự + chuyển kênh phù hợp.
+  - Hỏi về điểm, deadline, thông tin hành chính -> từ chối lịch sự, chuyển kênh phù hợp.
 - Case đặc thù domain (④):
-  - Học viên trả lời đúng kết quả nhưng giải thích sai bản chất -> yêu cầu giải thích ngắn 1-2 câu để xác thực hiểu thật.
+  - Cùng một đáp án đúng nhưng giải thích sai vì khác bối cảnh nghề nghiệp -> yêu cầu học viên giải thích ngắn theo góc nhìn profile của mình.
 
 ## §7. Kiểm thử
 - Chiều chất lượng + định nghĩa kiểm chứng:
-  - Misconception diagnosis accuracy: % case gán đúng nhóm lỗi theo đáp án chuẩn.
-  - Learning recovery rate: % case sai lần 1 nhưng đúng lần 2 sau hint.
-  - Grounded feedback rate: % phản hồi có trích dẫn hợp lệ và liên quan.
-  - Safe fallback rate: % case thiếu dữ liệu nhưng không bịa.
+  - Profile alignment accuracy: % trường hợp hệ thống xác định đúng nhóm học viên phù hợp với câu hỏi và phản hồi.
+  - Learning recovery rate: % trường hợp sai lần 1 nhưng đúng sau tối đa 2 vòng phản hồi theo profile.
+  - Grounded feedback rate: % phản hồi có căn cứ từ bài học và ví dụ tương ứng.
+  - Safe fallback rate: % trường hợp thiếu thông tin nhưng không bịa hoặc ép profile sai.
 
-- Golden set (file se tao trong `eval/`):
+- Golden set (file sẽ tạo trong eval/):
   - Tối thiểu 24 case:
-    - 10 case sai khái niệm cốt lõi (tokenization, attention, prompt quality).
-    - 6 case mơ hồ/thiếu ngữ cảnh.
-    - 4 case ngoài phạm vi.
-    - 4 case phản ví dụ domain (đúng đáp án nhưng sai giải thích).
-  - Mỗi case gồm: question, learner_answer, expected_misconception, expected_feedback_level, expected_source_anchor.
+    - 8 case cho profile Data/AI.
+    - 8 case cho profile IT/Dev.
+    - 8 case cho profile Non-IT.
+  - Mỗi case gồm: profile, question, learner_answer, expected_misconception, expected_feedback_style, expected_source_anchor.
 
-- Quality bar (chot tai CP4):
+- Quality bar (chốt tại CP4):
   - Đạt khi:
-    - >= 75% case gán đúng misconception.
-    - >= 70% case sai lần 1 được sửa đúng sau tối đa 2 lượt phản hồi.
+    - >= 75% case xác định đúng profile và context phù hợp.
+    - >= 70% case sai lần 1 sửa đúng sau tối đa 2 vòng phản hồi cá nhân hóa.
     - >= 90% phản hồi có citation hợp lệ hoặc fallback đúng quy tắc.
     - 100% case ngoài phạm vi không bịa thông tin.
 
-- Kết quả các lượt chạy (cap nhat truoc CP6):
+- Kết quả các lượt chạy (cập nhật trước CP6):
 
-| Lần chạy | So case | Misconception accuracy | Recovery rate | Grounded/fallback đúng | Ghi chú |
+| Lần chạy | Số case | Profile alignment | Recovery rate | Grounded/fallback đúng | Ghi chú |
 |---|---:|---:|---:|---:|---|
-| Baseline | 24 | TBD | TBD | TBD | Chưa có tầng D2, dùng prompt tutor hiện tại |
-| Iteration 1 | 24 | TBD | TBD | TBD | Thêm misconception bank + hint ladder |
-| Iteration 2 | 24 | TBD | TBD | TBD | Tinh chỉnh prompt và routing low-confidence |
+| Baseline | 24 | TBD | TBD | TBD | Chưa có phân nhóm profile, dùng feedback chung |
+| Iteration 1 | 24 | TBD | TBD | TBD | Thêm profile mapping + personalized hint ladder |
+| Iteration 2 | 24 | TBD | TBD | TBD | Tinh chỉnh prompt theo 3 nhóm và fallback low-confidence |
 
 ## §8. Phân công & kế hoạch
 - Phân công có tên:
-  - Nguyễn Anh Tuấn (2A202602700) - Teamlead: điều phối dự án, phân chia công việc, tạo UI, chốt demo script.
-  - Đặng Quang Hưng (2A202602719) - Member: mining evidence, evidence table, chọn và kiểm 5+ turn_id.
-  - Nguyễn Hữu Thành (2A202602813) - Member: thiết kế misconception bank, prompt logic, fallback rules.
+  - Nguyễn Anh Tuấn (2A202602700) - Teamlead: điều phối, thiết kế UX, demo flow, tổng hợp bài toán profile-aware learning.
+  - Đặng Quang Hưng (2A202602719) - Member: mining evidence và lập profile map cho Data/AI, IT/Dev, Non-IT.
+  - Nguyễn Hữu Thành (2A202602813) - Member: thiết kế misconception bank, prompt logic, fallback rules theo profile.
   - Hà Thị Mỹ Linh (2A202602619) - Member: user test >=5 bạn, ghi log trước/sau, tổng hợp phản hồi và slide kết quả.
 
 - Willing users (bonus validation):
-  - Nguyễn Hoàng Cường - Học viên
-  - Văn Thành Huy - Học viên
-  - Nguyễn Tiến Phát - Học viên
-  - Kế hoạch vòng validation: cho mỗi bạn làm 1 mini-flow 3 câu (1 sai de test hint, 1 sua sau hint, 1 feedback survey 2 cau), log thoi gian va muc do hieu.
+  - Nguyễn Hoàng Cường - Học viên profile Data/AI
+  - Văn Thành Huy - Học viên profile IT/Dev
+  - Nguyễn Tiến Phát - Học viên profile Non-IT
+  - Kế hoạch vòng validation: cho mỗi bạn làm 1 mini-flow 3 câu (1 câu sai để test hint, 1 câu sửa sau hint, 1 câu survey để đánh giá độ phù hợp profile), log thời gian và mức độ hiểu.
 
-- Multi-prototype (neu lam):
-  - PA1: Hint ladder rule-based + retrieval theo keyword.
-  - PA2: Classifier misconception + retrieval theo semantic similarity.
-  - Tieu chi chon: accuracy cao hon va thoi gian phan hoi <= 6s.
+- Multi-prototype (nếu làm):
+  - PA1: Rule-based profile-aware hint ladder.
+  - PA2: Classifier profile + retrieval semantic similarity theo từng nhóm.
+  - Tiêu chí chọn: độ chính xác cao hơn và thời gian phản hồi <= 6s.
 
 ## §9. Changelog
 
 | Thời điểm | Đổi gì | Vì sao (trỏ về feedback/case nào) |
 |---|---|---|
+| 17/09/2026 | Chuyển trọng tâm từ adaptive quiz feedback chung sang profile-aware personalized learning | Đề bài của nhóm xác định rõ: mỗi học viên có background nghề nghiệp khác nhau và nên nhận câu hỏi, ví dụ, phản hồi khác nhau dù cùng kiến thức |
+| 17/09/2026 | Thêm profile map Data/AI, IT/Dev, Non-IT vào golden set và prompt logic | Duy trì tính phù hợp với khóa học K4 và các nhóm học viên khác nhau |
