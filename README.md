@@ -4,12 +4,12 @@
 
 ## 👥 Thành viên nhóm & Phân công vai trò
 
-**Lớp:** 3B · **Phòng:** ____ · **Cụm:** ____ · **Track:** ____
+**Lớp:** 3B · **Phòng:** E402 · **Cụm:** C3 · **Track:** D2
 
 | Họ và Tên | Mã Học Viên | Vai trò chính | Phần việc đảm nhiệm trong dự án |
 |---|---|---|---|
 | Nguyễn Anh Tuấn | 2A202602700 | Teamlead | Điều phối dự án, phân chia công việc, tạo UI |
-| Đặng Quang Hưng | 2A202602719 |  |  |
+| Đặng Quang Hưng | 2A202602719 | Thành viên |  |
 | Nguyễn Hữu Thành | 2A202602813 |  |  |
 | Hà Thị Mỹ Linh | 2A202602619 |  |  |
 
