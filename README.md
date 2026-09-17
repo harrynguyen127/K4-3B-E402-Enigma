@@ -11,7 +11,7 @@
 | Nguyễn Anh Tuấn | 2A202602700 | Teamlead | Điều phối dự án, phân chia công việc, tạo UI |
 | Đặng Quang Hưng | 2A202602719 | Thành viên |  |
 | Nguyễn Hữu Thành | 2A202602813 |  |  |
-| Hà Thị Mỹ Linh | 2A202602619 |  |  |
+| Hà Thị Mỹ Linh | 2A202602619 | BA  | Track chính về tìm hiểu thị trường |
 
 > Nhóm copy nguyên file README này về repo của mình, rồi điền bảng trên. Cột **Phần việc đảm nhiệm** ghi càng cụ thể càng tốt.
 
