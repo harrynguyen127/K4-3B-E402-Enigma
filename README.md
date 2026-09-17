@@ -8,7 +8,7 @@
 
 | Họ và Tên | Mã Học Viên | Vai trò chính | Phần việc đảm nhiệm trong dự án |
 |---|---|---|---|
-| Nguyễn Anh Tuấn | 2A202602700 | Teamlead |  |
+| Nguyễn Anh Tuấn | 2A202602700 | Teamlead | Điều phối dự án, phân chia công việc, tạo UI |
 | Đặng Quang Hưng | 2A202602719 |  |  |
 | Nguyễn Hữu Thành | 2A202602813 |  |  |
 | Hà Thị Mỹ Linh | 2A202602619 |  |  |
