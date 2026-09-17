@@ -62,20 +62,26 @@ Loại: [x] Tính năng mới
   - Không thay thế toàn bộ tutor hiện có trên VLearn.
   - Không xử lý các câu hỏi hành chính, lịch học, nộp bài, điểm số.
 - Mức prototype nhắm tới: [ ] Sketch [ ] Mock [x] Working
-  - Thật: profile classifier -> contextualized question generation -> personalized hint -> source grounding -> retry question.
-  - Mock: dashboard giảng viên và profile mapping chỉ ở mức demo tĩnh.
+  - Bản mẫu tương tác (trang tĩnh HTML/CSS/JS, chạy được trực tiếp trên trình duyệt, không cần server): `codebase/prototype.html`.
+  - Thật (chạy trong prototype, logic có thật dù data cố định): chọn hồ sơ (persona) ở thanh trên cùng đổi ngay toàn bộ gợi ý + giải thích; chọn đáp án A-D có phản hồi đúng/sai theo state; nút "Xem gợi ý" và "Kiểm tra" là hai luồng độc lập thật sự (không phải ảnh tĩnh).
+  - Giả lập (Mock — sẽ thay bằng AI thật ở CP3): nội dung câu hỏi/giải thích/thuật ngữ cho 3 persona đang là dữ liệu viết sẵn (fixed), chưa qua profile classifier hay contextualized question generation thật; dashboard giảng viên và profile mapping cũng chỉ demo tĩnh.
+  - Lộ trình sang "Thật": profile classifier -> contextualized question generation -> personalized hint -> source grounding -> retry question (làm ở CP3, thay thế phần dữ liệu cố định trong `codebase/prototype.html`).
 - Automation: [x] augment [x] conditional [ ] automate
-  - Lý do: nếu xác định profile/độ phù hợp không chắc chắn, hệ thống phải hỏi lại hoặc yêu cầu xác nhận profile thay vì đoán mò.
+  - Lý do (theo cost-of-error, §2.3):
+    - **Augment** cho bước sinh câu hỏi/ví dụ theo profile: nếu AI gán sai ví dụ hoặc sai độ khó cho một profile, học viên hiểu sai bản chất khái niệm ngay từ lần học đầu và phải mất một vòng làm lại mới phát hiện ra — cái giá của lỗi là **kiến thức sai + thời gian học lại**, đắt hơn nhiều so với chi phí để giảng viên duyệt trước bộ câu hỏi theo từng profile. Vì vậy người quyết định cuối vẫn là giảng viên, AI chỉ gợi ý.
+    - **Conditional** cho bước chọn hồ sơ và sinh giải thích: đa số case học viên đã có profile rõ ràng (đã chọn ở thanh hồ sơ) và có nội dung bài học tương ứng — đây là case lành, để AI tự trả lời ngay (như trong `codebase/prototype.html`, đổi persona là thấy giải thích khác ngay). Số ít case không chắc profile hoặc không tìm được nội dung tương ứng là case hiểm (dễ khiến học viên hiểu sai và mất niềm tin vào hệ thống) — case này tốn kém hơn nếu AI tự đoán, nên hệ thống hỏi lại một câu ngắn thay vì đoán mò.
+    - Automate bị loại vì sai ở đây không rẻ và học viên (nhất là Non-IT) không phải lúc nào cũng tự nhận ra được ngay khi giải thích sai profile.
 
 ### §4b. Nguyên tắc đã áp dụng (HAX/PAIR)
 
-| Nguyên tắc | Áp cụ thể vào đâu trong prototype |
+*Vị trí cụ thể trỏ vào file `codebase/prototype.html` — mở file bằng trình duyệt để kiểm chứng trực tiếp từng dòng dưới đây.*
+
+| Nguyên tắc (mã HAX) | Áp cụ thể vào đâu trong prototype |
 |---|---|
-| Disclosure rõ ràng | Mở đầu phản hồi nêu rõ đây là gợi ý cá nhân hóa theo profile của học viên, không phải đáp án chính thức |
-| Nêu giới hạn & nguồn sự thật | Mỗi phản hồi bắt buộc gắn với nội dung bài học và ví dụ có căn cứ; thiếu thứ đó thì fallback rõ ràng |
-| Progressive disclosure | Hint 3 mức: gợi ý nhẹ -> nhấn mạnh sai giả định -> giải thích theo profile và ví dụ cụ thể |
-| User control | Học viên có thể chọn “giải thích theo hướng Data/AI”, “theo hướng Dev”, hoặc “giải thích đơn giản hơn” |
-| Recovery path | Nếu không chắc chắn profile, hỏi một câu ngắn để xác định nhóm phù hợp hoặc đưa ví dụ khái quát hơn |
+| **G2** — Làm rõ nó làm tốt đến đâu *(nhóm khởi đầu)* | Dòng phụ đề dưới tiêu đề "Cá nhân hóa giải thích theo background" và banner "Hồ sơ học viên... Dữ liệu đã biết từ trước — lấy từ CV/onboarding, không phải từ câu trả lời" — nói rõ hệ thống cá nhân hóa PHẦN GIẢI THÍCH, không phải tự chấm đúng/sai hộ học viên. |
+| **G10** — Thu hẹp phạm vi khi nghi ngờ *(bắt buộc)* | Nút `#btn-check` ("Kiểm tra") bị khóa (`disabled`) cho tới khi học viên đã chọn một đáp án — hệ thống không tự suy đoán câu trả lời hay tự chấm khi chưa có input rõ ràng. Tương ứng ngoài đời: khi chưa xác định được profile/độ tin cậy, hệ thống hỏi lại thay vì đoán (mô tả ở §4 phần Conditional). |
+| **G9** — Sửa dễ dàng | Thanh "Hồ sơ học viên" (`.pill-group`, `#view-flow`) cho phép đổi persona (Non-IT / Data-AI / IT-Dev) bất kỳ lúc nào — toàn bộ gợi ý và giải thích cập nhật lại ngay lập tức, học viên không cần làm lại câu hỏi để sửa góc nhìn sai. |
+| **G11** — Giải thích vì sao | Khối `#result-wrap` hiện ra sau khi bấm "Kiểm tra": banner đúng/sai + khối "Giải thích cho [persona]" nêu rõ vì sao đáp án B đúng, kèm mục "Giải thích thuật ngữ" — luôn gắn lý do với hành động vừa thực hiện (chọn đáp án), không chỉ báo đúng/sai suông. |
 
 ## §5. Kiểu lỗi — 4 lớp chỗ khó + kịch bản
 
@@ -91,18 +97,25 @@ Loại: [x] Tính năng mới
 | E8 | ④ Đặc thù domain học tập | Feedback quá dài, nhiều khái niệm không liên quan | Học viên bỏ cuộc | Giới hạn phản hồi 2-3 câu + 1 câu kiểm tra lại |
 
 ## §6. Bốn đường đi của trải nghiệm
+*Đối chiếu trực tiếp trong `codebase/prototype.html` theo từng bước bấm nêu dưới đây.*
+
 - Happy path:
   - Học viên làm sai -> hệ thống xác định profile -> tạo lại câu hỏi hoặc hint theo profile -> học viên hiểu đúng ở lần quay lại.
+  - Trong prototype: chọn persona ở thanh trên cùng -> chọn đáp án B -> bấm "Kiểm tra" -> banner xanh "Chính xác!" + khối giải thích đúng persona hiện ra ngay.
 - Low-confidence (②):
   - Không chắc học viên thuộc nhóm nào -> hỏi 1 câu ngắn để xác định profile trước khi cho feedback.
+  - Trong prototype: nút "Kiểm tra" khóa (`disabled`) khi chưa chọn đáp án — mô phỏng nguyên tắc "chưa đủ thông tin thì không tự chấm/đoán" (G10, §4b).
 - Failure/không căn cứ (①):
   - Không đủ dữ liệu hoặc không tìm thấy phần nội dung tương ứng -> nói rõ “chưa đủ căn cứ” và gợi ý xem lại bài học trước khi làm lại.
+  - Trong prototype: chọn đáp án sai (A/C/D) -> bấm "Kiểm tra" -> banner đỏ "Chưa đúng — đáp án đúng là B" (không bịa lý do, chỉ nêu đáp án đúng + giải thích có căn cứ theo persona).
 - Correction (user sửa):
   - Học viên báo “vẫn chưa hiểu” -> tăng mức hỗ trợ từ hint sang explain theo cùng profile, không đổi sang cách giải thích khác nhóm.
+  - Trong prototype: bấm "Xem gợi ý" trước (mức hỗ trợ nhẹ) -> nếu vẫn chưa rõ, bấm "Kiểm tra" để xem giải thích đầy đủ (mức hỗ trợ sâu hơn) — cả hai đều theo đúng persona đang chọn, không tự đổi nhóm.
 - Khi bị đòi ngoài phạm vi (③):
   - Hỏi về điểm, deadline, thông tin hành chính -> từ chối lịch sự, chuyển kênh phù hợp.
 - Case đặc thù domain (④):
   - Cùng một đáp án đúng nhưng giải thích sai vì khác bối cảnh nghề nghiệp -> yêu cầu học viên giải thích ngắn theo góc nhìn profile của mình.
+  - Trong prototype: đổi persona (Non-IT ↔ Data/AI ↔ IT-Dev) sau khi đã "Kiểm tra" -> khối giải thích đổi theo đúng góc nhìn mới ngay lập tức (G9 — sửa dễ dàng, §4b).
 
 ## §7. Kiểm thử
 - Chiều chất lượng + định nghĩa kiểm chứng:
