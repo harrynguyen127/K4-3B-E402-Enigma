@@ -37,7 +37,27 @@ const SCHEMA = `{
   "safety": {"refused":boolean,"reason":"out_of_scope|prompt_injection|asks_answer_directly"|null}
 }`;
 
+/* ---------- mode "hint" (offline batch, scripts/generate-hints.js) ----------
+ * KHÔNG đưa đáp án đúng vào prompt → model không thể lộ đáp án. */
+const HINT_SYSTEM = `Bạn là trợ giảng khoá "AI Thực Chiến". Nhiệm vụ: viết MỘT gợi ý ngắn (tối đa 2 câu, tiếng Việt) giúp học viên tự suy nghĩ về câu trắc nghiệm, theo đúng hồ sơ (persona) được mô tả.
+Quy tắc: không nêu hay ám chỉ phương án nào đúng, không loại trừ phương án, không nhắc chữ cái A/B/C/D. Chỉ gợi hướng suy nghĩ hoặc một câu hỏi dẫn dắt phù hợp persona.
+Đầu ra: CHỈ JSON {"hint": string}.`;
+
+function buildHintPrompt(req) {
+  const q = req.question || {};
+  const options = Object.entries(q.options || {}).map(([k, v]) => `${k}. ${v}`).join("\n");
+  const user = `HỒ SƠ HỌC VIÊN (persona = ${req.persona}): ${req.persona_style || PERSONA_FALLBACK[req.persona] || ""}
+
+CÂU HỎI ${q.id} — chủ đề: ${q.topic}
+${q.stem}
+${options}
+
+Viết gợi ý theo quy tắc. Trả về JSON {"hint": "..."}.`;
+  return { system: HINT_SYSTEM, user };
+}
+
 function buildPrompt(req) {
+  if (req.mode === "hint") return buildHintPrompt(req);
   const q = req.question || {};
   const personaStyle = req.persona === "unknown"
     ? "(CHƯA RÕ — phải hỏi lại, không giải thích)"
@@ -85,4 +105,4 @@ ${SCHEMA}`;
   return { system: SYSTEM, user };
 }
 
-module.exports = { buildPrompt, SYSTEM, SCHEMA };
+module.exports = { buildPrompt, buildHintPrompt, SYSTEM, SCHEMA, PROMPT_VERSION: "0.2" };

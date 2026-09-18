@@ -24,7 +24,7 @@ window.Trace = (function () {
         id, ts: new Date().toISOString(), mode, provider,
         request, prompt: prompt || null,
         raw_response: null, parsed: null, latency_ms: null, error: null,
-        eval: null
+        eval: null, user_feedback: null
       });
       persist();
       return id;
@@ -46,6 +46,14 @@ window.Trace = (function () {
       const e = entries.find(x => x.id === id);
       if (!e) return;
       e.eval = Object.assign({}, e.eval || {}, evalObj, { graded_at: new Date().toISOString() });
+      persist();
+    },
+
+    /** Phản hồi của HỌC VIÊN (👍/👎 + lý do) — tách khỏi eval của người chấm. */
+    feedback(id, fb) {
+      const e = entries.find(x => x.id === id);
+      if (!e) return;
+      e.user_feedback = Object.assign({}, fb, { at: new Date().toISOString() });
       persist();
     },
 

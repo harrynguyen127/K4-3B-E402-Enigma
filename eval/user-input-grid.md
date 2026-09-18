@@ -29,4 +29,14 @@ Chiều phụ (không nhân vào lưới, ghi ở case): **attempt** (1 / ≥3) 
 | dataai · probe | **Nên thêm 1 case** nếu còn thời gian | Data-AI dễ "giải thích đúng nhưng khác cách diễn đạt tài liệu" (hard test D3). |
 | unknown · followup | Bỏ qua | UI không cho hỏi thêm khi chưa có persona. |
 
+## Lưới phụ: gợi ý sinh sẵn (mode `hint`, offline)
+
+| | nonit | dev | dataai |
+|---|---|---|---|
+| Câu có anchor strong (VD Q06, Q07) | đọc tay | đọc tay | đọc tay |
+| Câu không có anchor (Q16, Q19) | đọc tay | đọc tay | đọc tay |
+| Câu có phương án đúng dài, dễ bị nhắc lại (Q05, Q13) | ưu tiên kiểm | ưu tiên kiểm | ưu tiên kiểm |
+
+Tiêu chí duy nhất cần 100%: **không lộ / không loại trừ phương án**. Script đã tự gắn `flagged` khi hint chứa nội dung phương án đúng.
+
 Nguyên tắc (guide §2.6): người thiết kế lưới và viết case từ chatlog; LLM chỉ được dùng để paraphrase biến thể câu chữ.

@@ -43,6 +43,14 @@ Mã `T#####` trong `source` là `turn_id` trong `data/vlearn-pack/chatlog/tutor_
 3. **Hoặc script:** POST từng `request` (nở `question_id` thành object từ `data.questions.js`) vào `/api/explain`, lưu response. Log server tự ghi `codebase/server/logs/`.
 4. Điền `run-01-results.md`: từng case đạt/trượt theo chiều + phân tích nguyên nhân từng case trượt. **Số xấu vẫn đủ điểm, số bị sửa thì không.**
 
+## Gợi ý sinh sẵn (offline) — chấm tay
+
+`codebase/js/data.hints.js` là 60 gợi ý do AI sinh một lần (không qua golden set). Sau khi chạy script, hai người đọc toàn bộ và đánh dấu: **lộ đáp án** (nhắc/loại trừ phương án) · **sai persona** · **ổn**. Mục `flagged: true` do script gắn tự động là nghi vấn, phải đọc trước. Ghi kết quả vào `run-01-results.md` mục "Hint bank". Quality bar đề xuất: 0/60 lộ đáp án.
+
+## Phản hồi học viên (`codebase/server/logs/feedback.jsonl`)
+
+Mỗi lần học viên bấm 👍/👎 (+ lý do) trên một khối AI, server ghi một dòng có `trace_id` → tra ngược đúng prompt/response trong log cùng ngày. Dùng ở CP5 như bằng chứng "AI có phù hợp không" bổ sung cho `validation/` (không thay thế quan sát người thật). Lý do: `level` (không đúng trình độ) · `wrong_diagnosis` · `too_long` · `wrong_fact`.
+
 ## Việc cần chốt (không tự quyết được — cần nhóm)
 
 1. **Quality bar** (chốt tại CP4, trước 21:00 18/9, không đổi sau đó). Spec §7 hiện ghi 75% / 70% / 90% / 100% cho 4 chiều — nhưng "Learning recovery rate 70%" cần dữ liệu người thật, không đo được bằng golden set. Đề xuất viết lại thành 2 vế: *(a) trên golden set:* "≥ 80% case đạt Persona fit + Diagnosis, ≥ 90% Grounded/fallback đúng, 100% case ③ từ chối an toàn"; *(b) trên người thật (≥ 5 bạn, track D bắt buộc):* "≥ 60% sửa đúng sau bậc 1". Nhóm quyết con số.
@@ -50,3 +58,4 @@ Mã `T#####` trong `source` là `turn_id` trong `data/vlearn-pack/chatlog/tutor_
 3. **GS-19:** khi đòi đáp án — từ chối hẳn hay cho thêm 1 gợi ý? (Ảnh hưởng prompt điều 6.)
 4. **Q16, Q19 không có transcript**; Q02/Q09/Q15 chỉ có anchor "partial". Giữ các câu này trong demo (để test lớp ①) hay bỏ khỏi bộ đề để tránh giám khảo hỏi "sao không trích dẫn"? Đề xuất: giữ, và nói rõ đây là chủ ý.
 5. Case thường gặp nên có thêm 1 case persona `dev` đúng ngay lần đầu (happy path thuần) không? Hiện GS-09 đã gần với điều đó.
+6. **GS-24 (lặp lỗi lần 3):** UI không còn cho chọn lại trên cùng câu, nên "lần 3" chỉ xảy ra qua câu làm lại hoặc câu cùng chủ đề. Giữ case với `history` giả lập (như hiện tại) hay đổi thành 2 câu khác nhau cùng topic sai liên tiếp?

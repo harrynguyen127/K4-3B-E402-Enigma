@@ -323,7 +323,7 @@
     },
     {
       "id": "GS-24", "group": "rare", "layer": null,
-      "source": "team (hard test D2: cùng một lỗi lặp lại lần thứ ba)",
+      "source": "team (hard test D2: cùng một lỗi lặp lại lần thứ ba) — CẦN REVIEW: UI không cho chọn lại cùng câu; 'attempt 3' ở đây là lịch sử giả lập (xem eval/README.md mục 6)",
       "grid": { "persona": "dataai", "learner_state": "wrong", "input": "diagnose", "anchor": "strong" },
       "request": { "mode": "diagnose", "persona": "dataai", "question_id": "Q07", "learner_answer": "A", "attempt": 3,
         "history": [ { "question_id": "Q07", "answer": "A", "verdict": "incorrect" }, { "question_id": "Q07", "answer": "C", "verdict": "incorrect" } ] },
