@@ -17,9 +17,10 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { buildPrompt } = require("./prompt");
-const { callModel, parseModelJson, appendLog, lastModelUsage, anthropicModel } = require("./model");
+const { buildPrompt, SYSTEM, HINT_SYSTEM, PROMPT_VERSION } = require("./prompt");
+const { callModel, parseModelJson, appendLog, lastModelUsage, estimateCost, anthropicModel } = require("./model");
 const { retrieveAnchors, retrievalStatus } = require("./retrieval");
+const cache = require("./cache");
 
 const ROOT = path.resolve(__dirname, "..");           // codebase/
 const PORT = Number(process.env.PORT || 8787);
@@ -211,9 +212,22 @@ const server = http.createServer(async (req, res) => {
     let request;
     try { request = JSON.parse(await readBody(req)); } catch (_) { return json(res, 400, { error: "Body không phải JSON" }); }
     if (!request || typeof request !== "object" || !request.question || typeof request.question !== "object") return json(res, 400, { error: "Thiếu request.question (xem AI_CONTRACT.md §2)" });
+    // options.no_cache: nút "Sinh trực tiếp" trên demo — luôn gọi model thật, không đọc cache
+    // (vẫn write-through để các lượt "Kiểm tra" sau dùng lại đúng nội dung vừa sinh).
+    const noCache = Boolean(request.options && request.options.no_cache);
+    delete request.options;
     attachTranscriptEvidence(request);
     const prompt = buildPrompt(request);
-    const entry = { ts: new Date().toISOString(), request, prompt, raw_response: null, parsed: null, validation: null, latency_ms: null, usage: null, error: null };
+    const key = cache.cacheKey(request);
+    const hit = noCache ? null : cache.get(key);
+    const provider = String(process.env.AI_PROVIDER || "").toLowerCase();
+    if (hit) {
+      // Kết quả sinh sẵn: không gọi model. Vẫn ghi log để trace/eval biết đây là bản cache.
+      const latency_ms = Date.now() - t0;
+      appendLog(new Date().toISOString().slice(0, 10) + ".jsonl", { ts: new Date().toISOString(), request, prompt: hit.prompt, raw_response: hit.raw_response, parsed: hit.parsed, validation: hit.validation, latency_ms, usage: hit.usage, cached: true, cached_at: hit.cached_at, error: null });
+      return json(res, 200, { prompt: hit.prompt, raw_response: hit.raw_response, parsed: hit.parsed, validation: hit.validation, latency_ms, usage: hit.usage, cost: estimateCost(hit.usage, provider), prompt_version: PROMPT_VERSION, generation: Object.assign({}, hit.generation || generationMetadata(), { cached: true, cached_at: hit.cached_at, personalization: (hit.generation?.personalization || "Theo persona") + " · sinh sẵn 1 lần, không gọi model lúc bấm Kiểm tra" }) });
+    }
+    const entry = { ts: new Date().toISOString(), request, prompt, raw_response: null, parsed: null, validation: null, latency_ms: null, usage: null, cached: false, error: null };
     try {
       const raw = await callModel(prompt);
       entry.raw_response = raw;
@@ -222,7 +236,9 @@ const server = http.createServer(async (req, res) => {
       entry.validation = validate(entry.parsed, request);
       entry.latency_ms = Date.now() - t0;
       appendLog(new Date().toISOString().slice(0, 10) + ".jsonl", entry);
-      json(res, 200, { prompt, raw_response: raw, parsed: entry.parsed, validation: entry.validation, latency_ms: entry.latency_ms, usage: entry.usage, generation: generationMetadata() });
+      const generation = generationMetadata();
+      if (provider !== "mock") cache.put(key, { prompt, raw_response: raw, parsed: entry.parsed, validation: entry.validation, usage: entry.usage, generation, latency_ms: entry.latency_ms });
+      json(res, 200, { prompt, raw_response: raw, parsed: entry.parsed, validation: entry.validation, latency_ms: entry.latency_ms, usage: entry.usage, cost: estimateCost(entry.usage, provider), prompt_version: PROMPT_VERSION, generation });
     } catch (e) {
       entry.error = e.message; entry.latency_ms = Date.now() - t0;
       appendLog(new Date().toISOString().slice(0, 10) + ".jsonl", entry);
@@ -255,8 +271,14 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
 
+  // Thông tin cấu hình prompt cho bảng log "Sinh trực tiếp" (không lộ API key).
+  if (req.method === "GET" && req.url === "/api/prompt-info") {
+    const gen = generationMetadata();
+    return json(res, 200, { prompt_version: PROMPT_VERSION, system_prompt_explain: SYSTEM, system_prompt_hint: HINT_SYSTEM, generation: gen, pricing: estimateCost({ model: gen.model, input_tokens: 0, output_tokens: 0 }, String(process.env.AI_PROVIDER || "").toLowerCase()), configured: providerConfigured() });
+  }
+
   if (req.method === "GET" && req.url === "/api/health") {
-    return json(res, 200, { ok: true, provider: process.env.AI_PROVIDER || null, configured: providerConfigured(), generation: generationMetadata(), retrieval: retrievalStatus() });
+    return json(res, 200, { ok: true, provider: process.env.AI_PROVIDER || null, configured: providerConfigured(), generation: generationMetadata(), retrieval: retrievalStatus(), cache: cache.status() });
   }
 
   // static

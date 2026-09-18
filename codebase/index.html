@@ -25,12 +25,46 @@
     </div>
   </div>
 
+  <!-- ===== GIỚI THIỆU ĐỀ (hiện ở bước 1; nội dung theo File_Tu_lam/Track_da_chon.md) ===== -->
+  <section class="card pad intro" id="sec-intro">
+    <div class="intro-head">
+      <div>
+        <div class="label">Đề D2 · Cá nhân hóa học tập theo hồ sơ học viên</div>
+        <h2>Tính năng này là gì và giải quyết vấn đề gì?</h2>
+      </div>
+      <button class="btn ghost sm" id="btn-intro-toggle" aria-expanded="true">Thu gọn</button>
+    </div>
+    <div class="intro-body" id="intro-body">
+      <div class="intro-col pain">
+        <div class="intro-tag">Vấn đề hiện tại</div>
+        <p>Học viên khoá "AI Thực Chiến" đến từ nhiều ngành nghề khác nhau, nhưng quiz trên VLearn chỉ có <b>một lời giải thích chung</b> cho tất cả. Người Non-IT gặp thuật ngữ kỹ thuật thì không hiểu; người Data/AI đọc ví dụ đời thường thì thấy thừa. Sai câu nào cũng chỉ thấy "đáp án đúng là B" mà không biết mình đang nhầm ở đâu.</p>
+      </div>
+      <div class="intro-col feat">
+        <div class="intro-tag">Tính năng</div>
+        <p><b>Cùng một câu hỏi, cùng một đáp án đúng</b>, nhưng lời giải thích đổi theo hồ sơ học viên: <span class="chip">Non-IT</span> <span class="chip">IT/Dev</span> <span class="chip">Data/AI</span>. Khi trả lời sai, AI chỉ ra giả định đang nhầm, đưa một gợi ý nhỏ để tự sửa, rồi mới giải thích đầy đủ theo nền tảng nghề nghiệp, kèm trích dẫn transcript buổi học nếu có.</p>
+      </div>
+      <div class="intro-col gain">
+        <div class="intro-tag">Cải thiện mong đợi</div>
+        <ul>
+          <li>Học viên hiểu <b>vì sao mình sai</b> bằng ngôn ngữ của chính ngành mình, thay vì chỉ biết đáp án.</li>
+          <li>Đáp án và kiến thức <b>không đổi</b> giữa các hồ sơ, chỉ đổi cách giảng, nên không lo lệch chuẩn.</li>
+          <li>Không bịa nguồn: có trích dẫn buổi học thì hiện mã đoạn, không có thì nói rõ "chưa có nguồn".</li>
+          <li>Hồ sơ chưa rõ thì hệ thống hỏi lại trước, không đoán.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="small intro-foot">Thử ngay: chọn hồ sơ ở Bước 1, làm câu 7 (temperature), trả lời sai rồi xem lời giải thích. Bấm "So sánh với hồ sơ khác" để thấy cùng đáp án nhưng khác cách giảng.</div>
+  </section>
+
   <!-- ===== STEPPER ===== -->
   <div class="stepper" id="stepper">
     <div class="step" data-step="1"><span class="num">1</span> Hồ sơ học viên</div>
     <div class="step" data-step="2"><span class="num">2</span> Nộp câu trả lời</div>
     <div class="step" data-step="3"><span class="num">3</span> Học từ lỗi (AI) & giải thích lại</div>
   </div>
+
+  <!-- ===== HƯỚNG DẪN THEO BƯỚC (đổi theo trạng thái; nội dung trong app.js → renderGuide) ===== -->
+  <div class="guide" id="guide" hidden></div>
 
   <div class="grid">
     <!-- ===== MAIN ===== -->
@@ -95,10 +129,44 @@
         <div id="followup-out"></div>
       </section>
 
+      <!-- SINH TRỰC TIẾP: nút gọi model thật ngay trước mặt giám khảo + bảng log (model, prompt, token, chi phí).
+           Đặt cuối cột chính để không chen vào luồng làm quiz chính. -->
+      <section class="card pad stack livegen" id="sec-livegen" hidden>
+        <div class="livegen-head">
+          <div>
+            <div class="label">Sinh trực tiếp bằng AI thật <span class="tour-tag d2">D2</span></div>
+            <h2 style="font-size:18px;margin-top:4px;">Gọi model ngay tại chỗ để sinh gợi ý và lời giải theo 3 hồ sơ</h2>
+            <div class="small">Bấm nút: hệ thống gửi 6 lời gọi (3 hồ sơ × gợi ý + giải thích) tới model đang cấu hình, <b>bỏ qua cache</b>. Kết quả vừa sinh được dùng làm gợi ý cho câu hỏi trong demo. Mỗi lời gọi ghi một dòng vào bảng log bên dưới: model, system prompt, prompt, phản hồi, token, chi phí.</div>
+          </div>
+          <!-- TẠM TẮT: tránh user test bấm spam tốn API thật. Bỏ "disabled" + title khi cần demo gọi AI thật. -->
+          <div class="row livegen-actions">
+            <button class="btn primary" id="btn-livegen" disabled title="Tạm khoá khi test UI — ">⚡ Sinh cho câu hiện tại</button>
+            <button class="btn" id="btn-livegen-all" disabled title="Tạm khoá khi test UI — ">Sinh cả 3 câu demo</button>
+          </div>
+        </div>
+        <div class="livegen-config" id="livegen-config"></div>
+        <div class="livegen-progress" id="livegen-progress" hidden></div>
+        <div class="livegen-log">
+          <div class="row" style="justify-content:space-between;align-items:center;">
+            <div class="label">Bảng log lời gọi AI <span class="small" id="livegen-count"></span></div>
+            <div class="row">
+              <button class="btn sm" id="btn-livegen-export">Xuất JSONL</button>
+              <button class="btn sm danger" id="btn-livegen-clear">Xoá log</button>
+            </div>
+          </div>
+          <div class="table-wrap"><table class="lg-table" id="livegen-table"></table></div>
+        </div>
+      </section>
+
     </div>
 
     <!-- ===== SIDEBAR ===== -->
     <aside class="sb">
+      <div class="sb-card tour" id="sb-tour">
+        <div class="label">Lộ trình thử nhanh <span class="small" id="tour-count"></span></div>
+        <ol class="tour-list" id="tour-list"></ol>
+        <div class="small">Mục có nhãn <span class="tour-tag d2">D2</span> là phần tính năng nhóm đang thực hiện; phần còn lại mô phỏng VLearn hiện tại.</div>
+      </div>
       <div class="sb-card">
         <div class="label">Tiến độ lượt này</div>
         <div class="sb-big"><span id="sb-done">0</span><span class="sb-of">/ 20</span></div>
@@ -154,9 +222,10 @@
 <div class="modal-bg" id="modal">
   <div class="modal">
     <h3 style="font-size:18px;">Cài đặt lời gọi AI</h3>
-    <label class="radio-row on" id="rr-live"><input type="radio" name="prov" value="live" checked><div><b>LIVE</b> — hint và explanation được sinh trực tiếp bởi model cấu hình trong <code>server/.env</code> (mặc định Claude qua Anthropic API; có thể đổi sang Ollama local).</div></label>
+    <label class="radio-row on" id="rr-mock"><input type="radio" name="prov" value="mock" checked><div><b>DEMO (mặc định)</b> — nút "Kiểm tra" không gọi API AI; verdict, chẩn đoán và giải thích lấy từ dữ liệu đã gen sẵn (<code>data.questions.js</code> · <code>data.hints.js</code>), không tốn phí, không cần server.</div></label>
+    <label class="radio-row" id="rr-live"><input type="radio" name="prov" value="live"><div><b>LIVE</b> — hint và explanation được sinh trực tiếp bởi model cấu hình trong <code>server/.env</code> (mặc định Claude qua Anthropic API; có thể đổi sang Ollama local). Chỉ dùng khi cần test pipeline thật.</div></label>
     <div>
-      <div class="label">Endpoint server</div>
+      <div class="label">Endpoint server (chỉ dùng khi chọn LIVE)</div>
       <input type="text" id="endpoint" style="width:100%;margin-top:6px;" placeholder="http://localhost:8787">
     </div>
     <div class="row">

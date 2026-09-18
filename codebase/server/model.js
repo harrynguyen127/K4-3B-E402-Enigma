@@ -111,7 +111,13 @@ async function anthropic({ system, user, mode }) {
   }
   if (response.stop_reason === "max_tokens") throw modelError("Anthropic: output bị cắt vì max_tokens; tăng ANTHROPIC_MAX_TOKENS.", 502);
   const text = response.content.filter(b => b.type === "text").map(b => b.text).join("");
-  lastUsage = { model: response.model, input_tokens: response.usage?.input_tokens, output_tokens: response.usage?.output_tokens, stop_reason: response.stop_reason };
+  lastUsage = {
+    model: response.model,
+    input_tokens: response.usage?.input_tokens, output_tokens: response.usage?.output_tokens,
+    cache_read_input_tokens: response.usage?.cache_read_input_tokens || 0,
+    cache_creation_input_tokens: response.usage?.cache_creation_input_tokens || 0,
+    stop_reason: response.stop_reason
+  };
   return ensureContent(text, "Anthropic");
 }
 
@@ -151,6 +157,27 @@ const HINT_SCHEMA = { type: "object", additionalProperties: false, properties: {
 
 let lastUsage = null;
 function lastModelUsage() { return lastUsage; }
+
+/* ---------------- ước tính chi phí (USD, giá Anthropic API công bố, $/1M token) ----------------
+ * Bảng giá tra ngày 18/09/2026. Ollama local = 0. Model lạ → null (UI hiện "n/a"). */
+const PRICE_PER_MTOK = [
+  [/^claude-(fable|mythos)-5/, { in: 10, out: 50 }],
+  [/^claude-opus-(5|4-8|4-7|4-6)/, { in: 5, out: 25 }],
+  [/^claude-sonnet-5/, { in: 2, out: 10 }],
+  [/^claude-sonnet-4-6/, { in: 3, out: 15 }],
+  [/^claude-haiku-4-5/, { in: 1, out: 5 }]
+];
+function estimateCost(usage, provider) {
+  if (!usage) return null;
+  if (provider === "ollama" || provider === "mock") return { input_usd: 0, output_usd: 0, total_usd: 0, rate_in_per_mtok: 0, rate_out_per_mtok: 0, note: provider === "ollama" ? "model local, không tính phí API" : "mock" };
+  const model = String(usage.model || "");
+  const hit = PRICE_PER_MTOK.find(([re]) => re.test(model));
+  if (!hit) return { input_usd: null, output_usd: null, total_usd: null, rate_in_per_mtok: null, rate_out_per_mtok: null, note: `chưa có bảng giá cho ${model || "model này"}` };
+  const rate = hit[1];
+  const input_usd = (usage.input_tokens || 0) / 1e6 * rate.in;
+  const output_usd = (usage.output_tokens || 0) / 1e6 * rate.out;
+  return { input_usd, output_usd, total_usd: input_usd + output_usd, rate_in_per_mtok: rate.in, rate_out_per_mtok: rate.out, note: null };
+}
 
 /* ---------------- OpenRouter / Ollama (fetch thuần) ---------------- */
 async function fetchJson(url, options, label) {
@@ -242,4 +269,4 @@ function loadDotEnv(file) {
   } catch (_) { /* không có .env cũng được — UI chạy MOCK */ }
 }
 
-module.exports = { callModel, parseModelJson, appendLog, lastModelUsage, anthropicModel, ANTHROPIC_DEFAULT_MODEL, LOG_DIR };
+module.exports = { callModel, parseModelJson, appendLog, lastModelUsage, estimateCost, anthropicModel, ANTHROPIC_DEFAULT_MODEL, LOG_DIR };

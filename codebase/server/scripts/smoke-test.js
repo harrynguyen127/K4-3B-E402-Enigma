@@ -48,7 +48,7 @@ async function main() {
   const ragEvidence = retrieveAnchors({ topic: "RAG", stem: "RAG truy xuất tài liệu để bổ sung ngữ cảnh như thế nào?", options: { A: "retrieval tài liệu nội bộ và citation" }, correct: "A" });
   if (!ragEvidence.length || !ragEvidence.some(x => x.code === "T03-036" || x.code === "T05-110")) throw new Error("transcript retrieval did not find expected RAG evidence");
   const child = spawn(process.execPath, [require("path").join(__dirname, "..", "server.js")], {
-    env: Object.assign({}, process.env, { AI_PROVIDER: "mock", RETRIEVAL_DISABLED: "1", PORT: String(port) }),
+    env: Object.assign({}, process.env, { AI_PROVIDER: "mock", RETRIEVAL_DISABLED: "1", EXPLAIN_CACHE: "off", PORT: String(port) }),
     stdio: ["ignore", "pipe", "pipe"]
   });
   let stderr = "";

@@ -105,4 +105,4 @@ ${SCHEMA}`;
   return { system: SYSTEM, user, mode: "explain" };
 }
 
-module.exports = { buildPrompt, buildHintPrompt, SYSTEM, SCHEMA, PROMPT_VERSION: "0.4" };
+module.exports = { buildPrompt, buildHintPrompt, SYSTEM, HINT_SYSTEM, SCHEMA, PROMPT_VERSION: "0.4" };

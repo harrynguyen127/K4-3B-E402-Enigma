@@ -9,3 +9,4 @@ Thumbs.db
 codebase/server/.env
 codebase/server/logs/*.jsonl
 codebase/server/node_modules/
+# Cache sinh sẵn CỐ Ý được commit (demo không gọi model): codebase/server/cache/explain-cache.json

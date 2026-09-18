@@ -12,11 +12,19 @@
  * ===================================================================== */
 window.AI = (function () {
   const SETTINGS_KEY = "enigma_ai_settings_v1";
-  const defaults = { provider: "live", endpoint: "http://localhost:8787" };
+  // Endpoint mặc định = origin của trang đang mở (http://localhost:8787 hoặc link tunnel);
+  // khi mở bằng file:// thì rơi về localhost. Người xem qua tunnel không cần chỉnh ⚙.
+  const sameOrigin = /^https?:$/.test(location.protocol) ? location.origin : "http://localhost:8787";
+  // Demo trên nút "Kiểm tra" KHÔNG được gọi API AI thật — luôn dùng dữ liệu đã gen sẵn
+  // (q.reference / HINT_BANK) qua mockExplain(). "live" vẫn còn để nhóm dev bật tay khi cần
+  // test pipeline thật, nhưng mặc định và mọi cấu hình cũ đều bị ép về "mock".
+  const defaults = { provider: "mock", endpoint: sameOrigin };
   let settings = Object.assign({}, defaults);
   try { settings = Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")); } catch (_) {}
-  // Nâng cấp cấu hình trình duyệt từ các bản demo cũ sang pipeline local thật.
-  if (settings.provider === "fake_live" || settings.provider === "mock") settings.provider = "live";
+  // Cài đặt cũ lưu localhost nhưng trang đang mở từ origin khác (tunnel) → dùng origin hiện tại.
+  if (/^https?:$/.test(location.protocol) && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(settings.endpoint || "") && settings.endpoint !== location.origin) settings.endpoint = location.origin;
+  // Ép mọi cấu hình đã lưu trước đó (live/fake_live) về mock cho bản demo này.
+  if (settings.provider !== "mock") settings.provider = "mock";
 
   function saveSettings(patch) {
     settings = Object.assign({}, settings, patch);
@@ -140,18 +148,29 @@ window.AI = (function () {
   }
 
   /* ---------------- PUBLIC ---------------- */
-  async function explain(request) {
-    const mode = settings.provider === "live" ? "LIVE" : "MOCK";
-    const traceMode = settings.provider === "live" ? "API" : mode;
+  async function explain(request, opts) {
+    // opts.forceLive: nút "Sinh trực tiếp" trên demo — luôn gọi server/API thật, bất kể
+    // provider đang là mock (nút "Kiểm tra" vẫn dùng dữ liệu sinh sẵn theo cấu hình).
+    const useLive = settings.provider === "live" || Boolean(opts && opts.forceLive);
+    const mode = useLive ? "LIVE" : "MOCK";
+    const traceMode = useLive ? "API" : mode;
     const t0 = performance.now();
-    const traceProvider = settings.provider === "live" ? settings.endpoint : "mock";
+    const traceProvider = useLive ? settings.endpoint : "mock";
     const traceId = window.Trace.start({ mode: traceMode, provider: traceProvider, request });
     try {
       let parsed, raw = null, prompt = null;
-      if (settings.provider === "live") {
+      if (useLive) {
         const out = await liveExplain(request);
         parsed = out.parsed; raw = out.raw_response; prompt = out.prompt;
         if (out.generation) parsed._generation = out.generation;
+        // Số liệu cho bảng log "Sinh trực tiếp": token, chi phí ước tính, prompt đầy đủ, phản hồi thô.
+        parsed._usage = out.usage || null;
+        parsed._cost = out.cost || null;
+        parsed._prompt = out.prompt || null;
+        parsed._raw = out.raw_response ?? null;
+        parsed._prompt_version = out.prompt_version || null;
+        parsed._validation = out.validation || null;
+        parsed._server_latency_ms = out.latency_ms ?? null;
       } else {
         await new Promise(r => setTimeout(r, 500 + Math.random() * 400)); // giả lập độ trễ
         parsed = mockExplain(request);
@@ -188,6 +207,13 @@ window.AI = (function () {
     fetch(settings.endpoint.replace(/\/$/, "") + "/api/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).catch(() => {});
   }
 
+  /** Thông tin prompt/model từ server cho panel cấu hình (GET /api/prompt-info). */
+  async function promptInfo() {
+    const res = await fetch(settings.endpoint.replace(/\/$/, "") + "/api/prompt-info");
+    if (!res.ok) throw new Error("Server " + res.status);
+    return res.json();
+  }
+
   function precomputedHint(questionId, persona) {
     const saved = window.HINT_BANK?.[questionId]?.[persona];
     if (saved?.hint) return { hint: saved.hint, flagged: saved.flagged, meta: window.HINT_BANK_META || {} };
@@ -196,7 +222,8 @@ window.AI = (function () {
   }
 
   return {
-    explain, sendFeedback, logEvent, precomputedHint,
+    explain, explainLive: (request) => explain(request, { forceLive: true }),
+    sendFeedback, logEvent, precomputedHint, promptInfo,
     settings: () => Object.assign({}, settings), saveSettings,
     isLive: () => settings.provider === "live",
     mode: () => settings.provider === "live" ? "LIVE" : "MOCK"

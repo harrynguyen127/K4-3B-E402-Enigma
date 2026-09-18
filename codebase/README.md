@@ -12,6 +12,16 @@ Mở `http://localhost:8787`. UI mặc định gọi **Claude (Anthropic API)** 
 
 Trước mỗi lời giải, server tự tìm tối đa 3 đoạn trong transcript bằng retrieval local, hoàn toàn độc lập với persona. Có đoạn đủ liên quan thì phản hồi kèm mã `[Txx-NNN]`; không có thì model vẫn giải thích bằng kiến thức chung và hiển thị ghi chú rõ rằng không có nguồn buổi học phù hợp.
 
+## Kết quả sinh sẵn (cache) — demo không gọi model lúc bấm "Kiểm tra"
+
+```bash
+node codebase/server/scripts/pregenerate.js                     # Q07, Q16, Q13 × 3 persona × mọi phương án + hint
+node codebase/server/scripts/pregenerate.js --questions Q07,Q01 # chọn câu khác
+node codebase/server/scripts/pregenerate.js --force             # sinh lại
+```
+
+Kết quả ghi vào `codebase/server/cache/explain-cache.json` (cố ý commit). Server đọc cache trước theo key `mode|question|persona|đáp án`; trúng thì trả ngay và UI ghi "Sinh sẵn lúc …"; trượt (câu khác, tổ hợp multi-select khác, hồ sơ "Chưa rõ", hỏi thêm, probe) thì gọi model như bình thường rồi tự thêm vào cache. Tắt cache: `EXPLAIN_CACHE=off`. `/api/health` cho biết cache có bao nhiêu mục theo câu.
+
 Smoke test không cần key:
 
 ```bash
@@ -29,6 +39,7 @@ Có thể mở thẳng `codebase/index.html` bằng trình duyệt (file://) —
 | `js/data.personas.js` | Mô tả 3 persona + "Chưa rõ" (đưa vào prompt) | Nội dung |
 | `js/data.hints.js` | Fallback Mock; ở chế độ LIVE, gợi ý được model sinh trực tiếp khi vào câu | AI Engineer |
 | `server/model.js` | `callModel()` — Anthropic (Claude, mặc định), OpenRouter, Ollama local, mock smoke provider | **AI Engineer** |
+| `server/cache.js`, `server/scripts/pregenerate.js` | Cache kết quả sinh sẵn theo câu × persona × đáp án; script sinh một lần | AI Engineer |
 | `server/scripts/generate-hints.js` | Batch sinh gợi ý 20 câu × 3 persona, tự gắn cờ nghi lộ đáp án | AI Engineer |
 | `js/ai-client.js` | Điểm gọi AI duy nhất `AI.explain()`; gọi server `/api/explain`; ghi trace | UI |
 | `js/trace.js` | Lưu prompt/raw/parsed từng lời gọi; xuất JSONL; chấm nhanh | UI |
@@ -63,3 +74,18 @@ Chưa chạy → nút "Xem gợi ý" hiện thông báo "chưa chạy sinh gợi
 - **LIVE:** `callModel()` trong `server/model.js` hỗ trợ Anthropic (Claude), OpenRouter và Ollama; `mock` chỉ dành cho smoke/offline test. UI hiển thị LIVE/MOCK riêng biệt.
 - **Nguồn:** 20 câu giữ nội dung AI track; anchors để rỗng có chủ ý khi chưa có transcript mapping đã xác minh.
 - **Mock có chủ ý (không làm trong hackathon):** đọc CV để suy persona; dashboard giảng viên; lưu lịch sử lỗi giữa các phiên.
+
+## Nút "Sinh trực tiếp bằng AI thật" (cho giám khảo)
+
+Ở bước 2 (dưới card câu hỏi) có card **Sinh trực tiếp bằng AI thật** với hai nút:
+
+- **⚡ Sinh cho câu hiện tại**: gửi 6 lời gọi (3 hồ sơ × gợi ý + giải thích) tới model đang cấu hình trong `server/.env`, kèm `options.no_cache = true` nên server **bỏ qua cache** và luôn gọi API. Nút này gọi API thật kể cả khi giao diện đang ở chế độ dữ liệu sinh sẵn (`AI.explainLive`).
+- **Sinh cả 3 câu demo**: lặp tuần tự cho Q01–Q03 (18 lời gọi).
+
+Gợi ý vừa sinh được nạp ngay vào nút **Xem gợi ý** của câu đó (ưu tiên hơn dữ liệu sinh sẵn) và ghi write-through vào `server/cache/explain-cache.json`.
+
+Bên dưới là **bảng log**: provider, model, API, effort, prompt version, đơn giá, tổng token in/out, chi phí ước tính, độ trễ trung bình, hai system prompt (bấm để mở), và mỗi dòng = một lời gọi (bấm dòng để xem system prompt, user prompt, phản hồi thô, usage, cost, validation). Log lưu trong `localStorage`, có nút **Xuất JSONL**.
+
+Endpoint mới: `GET /api/prompt-info` (prompt version, system prompt, pricing) và trường `cost`, `prompt_version` trong phản hồi `/api/explain`. Bảng giá ($/1M token) nằm ở `PRICE_PER_MTOK` trong `server/model.js` (tra ngày 18/09/2026: claude-opus-5 = 5 in / 25 out). Ollama = 0.
+
+Mẹo quay video: mở `index.html?persona=dev` để vào thẳng bước 2.
