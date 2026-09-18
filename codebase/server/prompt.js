@@ -1,6 +1,6 @@
 /* =====================================================================
  * PROMPT — bản nháp để AI Engineer tinh chỉnh. Mọi thay đổi ghi vào spec §9 Changelog.
- * buildPrompt(request) -> { system, user }
+ * buildPrompt(request) -> { system, user, mode }   (mode = "explain" | "hint")
  * ===================================================================== */
 "use strict";
 
@@ -52,7 +52,7 @@ ${q.stem}
 ${options}
 
 Viết gợi ý theo quy tắc. Trả về JSON {"hint": "..."}.`;
-  return { system: HINT_SYSTEM, user };
+  return { system: HINT_SYSTEM, user, mode: "hint" };
 }
 
 function buildPrompt(req) {
@@ -101,7 +101,8 @@ ${task}
 Trả về JSON đúng schema sau (không thêm gì khác):
 ${SCHEMA}`;
 
-  return { system: SYSTEM, user };
+  // mode: nhãn để model.js chọn JSON schema (structured outputs); không đưa vào prompt.
+  return { system: SYSTEM, user, mode: "explain" };
 }
 
 module.exports = { buildPrompt, buildHintPrompt, SYSTEM, SCHEMA, PROMPT_VERSION: "0.4" };

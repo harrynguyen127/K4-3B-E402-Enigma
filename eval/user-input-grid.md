@@ -7,7 +7,7 @@
 | **Loại đầu vào** | diagnose · followup · probe | followup là cửa vào của lớp ③; probe kiểm tra "đoán đúng mà không hiểu". |
 | **Nguồn trích dẫn** | strong · partial · none | none → bắt buộc `citation = null` + no_source_note (lớp ①). |
 
-Chiều phụ (không nhân vào lưới, ghi ở case): **attempt** (1 / ≥3) — lần 3 phải đổi cách tiếp cận (GS-24).
+Chiều phụ (không nhân vào lưới, ghi ở case): **attempt** (1 / ≥3) — lần 3 phải đổi cách tiếp cận. Bộ 20 hiện chưa có case attempt 3 (xem `README.md` mục 6).
 
 ## Độ phủ hiện tại (persona × trạng thái × đầu vào)
 
@@ -15,19 +15,20 @@ Chiều phụ (không nhân vào lưới, ghi ở case): **attempt** (1 / ≥3) 
 
 | | diagnose · wrong | diagnose · correct | diagnose · blank | followup | probe |
 |---|---|---|---|---|---|
-| **nonit** | GS-01 (strong) · GS-04 (strong) · GS-08 (strong) · GS-11 (none) · GS-20 (strong) | — | GS-14 | GS-16 (③) · GS-19 (③) | GS-23 |
-| **dev** | GS-03 (strong) · GS-07 (partial) · GS-21 (strong) | — | — | GS-12 (①) · GS-15 (②) · GS-17 (③) · GS-22 (rare) | GS-09 |
-| **dataai** | GS-02 (strong) · GS-05 (strong) · GS-06 (partial) · GS-10 (none) · GS-24 (attempt 3) | — | — | GS-18 (③) | — |
-| **unknown** | GS-13 | — | — | — | — |
+| **nonit** | GS-01 (strong) · GS-04 (strong) · GS-08 (strong) · GS-17 (strong) | — | GS-12 | GS-14 (③) | GS-20 |
+| **dev** | GS-03 (strong) · GS-07 (partial) · GS-18 (strong) | — | — | GS-10 (①) · GS-13 (②) · GS-15 (③) · GS-19 (rare) | — |
+| **dataai** | GS-02 (strong) · GS-05 (strong) · GS-06 (partial) · GS-09 (none) | — | — | GS-16 (③) | — |
+| **unknown** | GS-11 | — | — | — | — |
 
 ## Lỗ hổng đã biết và quyết định
 
 | Ô trống | Giữ hay bỏ | Lý do |
 |---|---|---|
-| diagnose · correct (cả 3 persona) | **Bỏ qua ở golden set** | Đúng ngay → không có quyết định AI khó; probe (GS-09, GS-23) đã phủ phần "hiểu thật". |
+| diagnose · correct (cả 3 persona) | **Bỏ qua ở golden set** | Đúng ngay → không có quyết định AI khó; probe (GS-20) đã phủ phần "hiểu thật". |
 | dev/dataai · blank | Bỏ qua | Hành vi giống GS-14, không phụ thuộc persona. |
-| dataai · probe | **Nên thêm 1 case** nếu còn thời gian | Data-AI dễ "giải thích đúng nhưng khác cách diễn đạt tài liệu" (hard test D3). |
+| dev / dataai · probe | **Nên thêm 1 case** nếu còn thời gian (mở rộng bộ >20) | Data-AI dễ "giải thích đúng nhưng khác cách diễn đạt tài liệu" (hard test D3). |
 | unknown · followup | Bỏ qua | UI không cho hỏi thêm khi chưa có persona. |
+| nonit · followup "cho đáp án luôn" | Chờ chốt | Đã bỏ khỏi bộ 20 vì chưa chốt hành vi (từ chối hẳn / thêm 1 gợi ý) — xem `README.md` mục 3. |
 
 ## Lưới phụ: gợi ý sinh sẵn (mode `hint`, offline)
 

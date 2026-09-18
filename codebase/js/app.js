@@ -12,6 +12,18 @@
   // ghi nhầm trạng thái khi người dùng chuyển câu trong lúc model còn chạy.
   const hintJobs = Object.create(null);
   const hintJobErrors = Object.create(null);
+  // Thông tin model đang chạy, lấy từ GET /api/health (server/model.js quyết định provider).
+  let serverGen = null;
+  function modelLabel() { return serverGen?.model || "model LIVE"; }
+  async function loadServerInfo() {
+    try {
+      const ep = window.AI.settings().endpoint.replace(/\/$/, "");
+      const j = await (await fetch(ep + "/api/health")).json();
+      serverGen = j.generation || null;
+      if (!j.configured) serverGen = { provider: "chưa cấu hình", model: null };
+    } catch (_) { serverGen = null; }
+    renderChrome();
+  }
   const FB_REASONS = [
     ["level", "Không đúng trình độ của tôi"],
     ["wrong_diagnosis", "Không đúng lỗi tôi mắc"],
@@ -27,7 +39,7 @@
     checked: false,         // đã nộp → khoá đáp án
     hintOpen: false,
     hintViewed: false,
-    liveHints: {},          // "Q01:nonit" -> hint sinh trực tiếp bởi model local
+    liveHints: {},          // "Q01:nonit" -> hint sinh trực tiếp bởi model LIVE
     hintBusy: false,
     hintError: null,
     ai: null,               // ExplainResponse của lần diagnose gần nhất
@@ -69,7 +81,7 @@
     });
     document.body.classList.add("presentation-mode");
     $("mode-badge").className = "mode-badge live";
-    $("mode-label").textContent = "LOCAL AI · Qwen 7B";
+    $("mode-label").textContent = serverGen ? `LIVE · ${serverGen.provider || "AI"}${serverGen.model ? " · " + serverGen.model : ""}` : "LIVE · đang kiểm tra server…";
 
     // tiến độ lượt
     const done = Object.keys(state.submitted).length;
@@ -124,7 +136,7 @@
     }
     if (!state.persona || state.persona === "unknown") return { text: null, why: "Chọn hồ sơ (Non-IT / IT-Dev / Data-AI) để nhận gợi ý phù hợp." };
     const h = hintData(state.persona);
-    if (!h || !h.hint) return { text: null, why: window.AI.isLive() ? "Model local chưa trả về gợi ý." : (HINT_META.generated_at ? "Chưa có gợi ý cho câu này." : "Chưa có gợi ý Mock cho câu này.") };
+    if (!h || !h.hint) return { text: null, why: window.AI.isLive() ? "Model chưa trả về gợi ý." : (HINT_META.generated_at ? "Chưa có gợi ý cho câu này." : "Chưa có gợi ý Mock cho câu này.") };
     return { text: h.hint, flagged: h.flagged, meta: h.meta };
   }
 
@@ -173,11 +185,11 @@
       const h = hintFor();
       hb.className = "hint-box" + (h.text ? "" : " empty");
       hb.innerHTML = state.hintBusy
-        ? `<span class="loading"><i></i><i></i><i></i> Qwen 7B đang sinh gợi ý theo hồ sơ…</span>`
+        ? `<span class="loading"><i></i><i></i><i></i> ${esc(modelLabel())} đang sinh gợi ý theo hồ sơ…</span>`
         : state.hintError
           ? `<span style="color:var(--red)">Không sinh được gợi ý: ${esc(state.hintError)}</span>`
           : h.text
-            ? `<b>Gợi ý (${esc(personaName())}):</b><span class="hint-text">${esc(h.text)}</span><span class="src">${window.AI.isLive() ? "Sinh trực tiếp bằng" : "AI sinh sẵn"} · ${esc(h.meta?.model || HINT_META.model || "Qwen 7B local")}</span>`
+            ? `<b>Gợi ý (${esc(personaName())}):</b><span class="hint-text">${esc(h.text)}</span><span class="src">${window.AI.isLive() ? "Sinh trực tiếp bằng" : "AI sinh sẵn"} · ${esc(h.meta?.model || HINT_META.model || modelLabel())}</span>`
             : esc(h.why);
     }
 
@@ -375,7 +387,7 @@
         state.liveHints[key] = {
           hint: output.hint,
           flagged: false,
-          meta: output._generation || { model: "qwen2.5:7b" }
+          meta: output._generation || serverGen || { model: modelLabel() }
         };
         delete hintJobErrors[key];
       }).catch(e => {
@@ -501,10 +513,11 @@
   $("btn-health").addEventListener("click", async () => {
     const ep = ($("endpoint").value || "").replace(/\/$/, "");
     $("health-out").textContent = "Đang kiểm tra…";
-    try { const r = await fetch(ep + "/api/health"); const j = await r.json(); $("health-out").textContent = j.configured ? `Server OK · provider: ${j.provider}` : "Server chạy nhưng CHƯA cấu hình AI_PROVIDER (sẽ trả 501)."; }
+    try { const r = await fetch(ep + "/api/health"); const j = await r.json(); $("health-out").textContent = j.configured ? `Server OK · provider: ${j.provider}${j.generation?.model ? " · model: " + j.generation.model : ""}` : "Server chạy nhưng CHƯA cấu hình AI_PROVIDER (sẽ trả 501)."; serverGen = j.generation || null; renderChrome(); }
     catch (e) { $("health-out").textContent = "Không kết nối được server: " + e.message; }
   });
   window.Trace.onChange(renderTrace);
 
   goStep(1);
+  void loadServerInfo();
 })();

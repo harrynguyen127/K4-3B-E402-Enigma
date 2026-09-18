@@ -16,7 +16,7 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 const { buildPrompt, PROMPT_VERSION } = require("../prompt");
-const { callModel, parseModelJson, appendLog } = require("../model");
+const { callModel, parseModelJson, appendLog, anthropicModel } = require("../model");
 
 const JS_DIR = path.resolve(__dirname, "..", "..", "js");
 const OUT = path.join(JS_DIR, "data.hints.js");
@@ -31,7 +31,7 @@ function looksLeaky(hint, q) {
   const h = (hint || "").toLowerCase();
   // Multi-select keys are comma-separated (e.g. "A, C, D"), so
   // q.options[q.correct] is undefined. Check every keyed correct option.
-  const keys = String(q.correct || "").toUpperCase().split(/[\\s,;|]+/).filter(Boolean);
+  const keys = String(q.correct || "").toUpperCase().split(/[\s,;|]+/).filter(Boolean);
   for (const key of keys) {
     const correctText = String(q.options?.[key] || "").toLowerCase().trim();
     if (correctText && h.includes(correctText.slice(0, Math.min(40, correctText.length)))) return true;
@@ -76,7 +76,9 @@ async function main() {
     }
   }
 
-  const meta = { generated_at: new Date().toISOString(), model: process.env.AI_MODEL || process.env.AI_PROVIDER || null, prompt_version: PROMPT_VERSION, calls, failures, flagged };
+  const provider = String(process.env.AI_PROVIDER || "").toLowerCase();
+  const modelName = provider === "anthropic" ? anthropicModel() : (process.env.AI_MODEL || process.env.OLLAMA_MODEL || process.env.OPENROUTER_MODEL || provider || null);
+  const meta = { generated_at: new Date().toISOString(), model: modelName, provider: provider || null, prompt_version: PROMPT_VERSION, calls, failures, flagged };
   const body = `/* SINH TỰ ĐỘNG bởi server/scripts/generate-hints.js — KHÔNG sửa tay.
  * Gợi ý trước-khi-nộp cho từng câu × persona. flagged=true: nghi lộ đáp án, nhóm đọc tay.
  * ${JSON.stringify(meta)} */

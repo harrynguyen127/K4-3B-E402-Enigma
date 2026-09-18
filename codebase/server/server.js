@@ -18,7 +18,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { buildPrompt } = require("./prompt");
-const { callModel, parseModelJson, appendLog } = require("./model");
+const { callModel, parseModelJson, appendLog, lastModelUsage, anthropicModel } = require("./model");
 const { retrieveAnchors, retrievalStatus } = require("./retrieval");
 
 const ROOT = path.resolve(__dirname, "..");           // codebase/
@@ -26,6 +26,7 @@ const PORT = Number(process.env.PORT || 8787);
 
 function providerConfigured() {
   const provider = String(process.env.AI_PROVIDER || "").trim().toLowerCase();
+  if (provider === "anthropic") return Boolean(String(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || "").trim());
   if (provider === "openrouter") return Boolean(String(process.env.OPENROUTER_API_KEY || "").trim());
   if (provider === "ollama") return Boolean(String(process.env.OLLAMA_URL || "http://localhost:11434").trim() && String(process.env.OLLAMA_MODEL || process.env.AI_MODEL || "qwen2.5:7b").trim());
   if (provider === "mock") return true;
@@ -34,6 +35,14 @@ function providerConfigured() {
 
 function generationMetadata() {
   const provider = String(process.env.AI_PROVIDER || "").trim().toLowerCase();
+  if (provider === "anthropic") return {
+    provider: "Anthropic (Claude)", api: "Anthropic Messages API (structured outputs)",
+    model: anthropicModel(),
+    endpoint: "https://api.anthropic.com/v1/messages",
+    effort: process.env.ANTHROPIC_EFFORT || "medium",
+    personalization: "Sinh trực tiếp theo persona: Non-IT, IT/Dev, Data/AI",
+    local: false
+  };
   if (provider === "ollama") return {
     provider: "Ollama (local)", api: "Ollama /api/chat",
     model: process.env.OLLAMA_MODEL || process.env.AI_MODEL || "qwen2.5:7b",
@@ -55,7 +64,7 @@ function validate(parsed, req) {
   const errors = [];
   if (!["correct", "incorrect", "no_answer"].includes(parsed.verdict)) errors.push("verdict không hợp lệ");
   if (parsed.citation) {
-    const allowed = new Set((req.question.anchors || []).map(a => a.code));
+    const allowed = new Set((req.question?.anchors || []).map(a => a.code));
     if (!allowed.has(parsed.citation.code)) errors.push(`citation.code "${parsed.citation.code}" không nằm trong anchors → nghi bịa nguồn (①)`);
   } else if (!parsed.needs_clarification && !parsed.safety?.refused && req.mode === "diagnose" && !parsed.no_source_note) {
     errors.push("citation = null nhưng thiếu no_source_note");
@@ -201,17 +210,19 @@ const server = http.createServer(async (req, res) => {
     const t0 = Date.now();
     let request;
     try { request = JSON.parse(await readBody(req)); } catch (_) { return json(res, 400, { error: "Body không phải JSON" }); }
+    if (!request || typeof request !== "object" || !request.question || typeof request.question !== "object") return json(res, 400, { error: "Thiếu request.question (xem AI_CONTRACT.md §2)" });
     attachTranscriptEvidence(request);
     const prompt = buildPrompt(request);
-    const entry = { ts: new Date().toISOString(), request, prompt, raw_response: null, parsed: null, validation: null, latency_ms: null, error: null };
+    const entry = { ts: new Date().toISOString(), request, prompt, raw_response: null, parsed: null, validation: null, latency_ms: null, usage: null, error: null };
     try {
       const raw = await callModel(prompt);
       entry.raw_response = raw;
+      entry.usage = lastModelUsage();
       entry.parsed = normalizeResponse(parseModelJson(raw), request);
       entry.validation = validate(entry.parsed, request);
       entry.latency_ms = Date.now() - t0;
       appendLog(new Date().toISOString().slice(0, 10) + ".jsonl", entry);
-      json(res, 200, { prompt, raw_response: raw, parsed: entry.parsed, validation: entry.validation, latency_ms: entry.latency_ms, generation: generationMetadata() });
+      json(res, 200, { prompt, raw_response: raw, parsed: entry.parsed, validation: entry.validation, latency_ms: entry.latency_ms, usage: entry.usage, generation: generationMetadata() });
     } catch (e) {
       entry.error = e.message; entry.latency_ms = Date.now() - t0;
       appendLog(new Date().toISOString().slice(0, 10) + ".jsonl", entry);
