@@ -149,5 +149,18 @@ window.AI = (function () {
     }
   }
 
-  return { explain, settings: () => Object.assign({}, settings), saveSettings, isLive: () => settings.provider === "live" };
+  /** Phản hồi 👍/👎 của học viên về một khối AI. Luôn ghi trace; gửi server khi LIVE. */
+  async function sendFeedback(fb) {
+    const payload = Object.assign({ ui_mode: settings.provider === "live" ? "LIVE" : "MOCK" }, fb);
+    if (fb.trace_id) window.Trace.feedback(fb.trace_id, payload);
+    if (settings.provider !== "live") return { ok: true, stored: "trace_only" };
+    try {
+      const res = await fetch(settings.endpoint.replace(/\/$/, "") + "/api/feedback", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+      });
+      return { ok: res.ok, stored: res.ok ? "server+trace" : "trace_only" };
+    } catch (_) { return { ok: false, stored: "trace_only" }; }
+  }
+
+  return { explain, sendFeedback, settings: () => Object.assign({}, settings), saveSettings, isLive: () => settings.provider === "live" };
 })();

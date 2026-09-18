@@ -11,6 +11,8 @@
  *      "partial" — chỉ chạm tới, phải trích dẫn dè dặt
  *      "none"    — transcript KHÔNG có → AI phải nói "chưa có trong tài liệu
  *                  buổi này", KHÔNG được bịa mã đoạn (lớp ① Nguồn sự thật).
+ *  - concept: {title, summary, draft} — "Kiến thức đang luyện" ở sidebar. BẢN NHÁP do
+ *    Claude soạn từ reference + anchors; nhóm review rồi đổi draft:false.
  * ===================================================================== */
 window.QUESTION_BANK = [
   {
@@ -32,7 +34,8 @@ window.QUESTION_BANK = [
       { code: "T06-148", quote: "Bất lợi đầu tiên là knowledge cutoff: bao giờ nó cũng có cái mốc chặn trên về mặt tri thức của nhân loại được input vào." },
       { code: "T06-147", quote: "Một trong những lý do dẫn đến hallucination nữa là nó bị cutoff." }
     ],
-    anchor_confidence: "strong"
+    anchor_confidence: "strong",
+    concept: { title: "Giới hạn kiến thức của LLM", summary: "Kiến thức của LLM dừng ở thời điểm huấn luyện (knowledge cutoff) và không bao gồm dữ liệu riêng của tổ chức. Muốn trả lời đúng về nội dung nội bộ, phải cung cấp tài liệu đó vào ngữ cảnh lúc hỏi.", draft: true }
   },
   {
     id: "Q02", topic: "RAG và Fine-tuning", difficulty: "Dễ",
@@ -53,7 +56,8 @@ window.QUESTION_BANK = [
       { code: "T03-119", quote: "Các bạn cũng đừng quá [không nghe rõ] cái kỹ thuật gọi là fine-tuning nhá. Tại vì để sử dụng được kỹ thuật fine-tuning, các bạn phải có kinh nghiệm trong việc phát triển model, phải có dữ liệu, phải validate được." },
       { code: "T03-036", quote: "Nãy các bạn bảo là sử dụng RAG — ok, dùng RAG cho một vài cái system nó tốt." }
     ],
-    anchor_confidence: "partial"
+    anchor_confidence: "partial",
+    concept: { title: "RAG và fine-tuning: khi nào dùng gì", summary: "RAG lấy tài liệu liên quan tại thời điểm trả lời nên cập nhật được ngay khi tài liệu đổi. Fine-tuning ghi kiến thức/hành vi vào trọng số, tốn dữ liệu và công validate, không phù hợp với thông tin thay đổi thường xuyên.", draft: true }
   },
   {
     id: "Q03", topic: "RAG và Hallucination", difficulty: "Trung bình",
@@ -74,7 +78,8 @@ window.QUESTION_BANK = [
       { code: "T06-138", quote: "LLM có thể sai, và trên thực tế không bao giờ có chuyện đúng 100%." },
       { code: "T04-047", quote: "Nó không phải là nó biết cái tri thức đấy, mà là nó đang dự đoán những từ tiếp theo, hoặc là những token." }
     ],
-    anchor_confidence: "partial"
+    anchor_confidence: "partial",
+    concept: { title: "Retrieval đúng ≠ generation trung thực", summary: "RAG gồm hai bước tách biệt: tìm tài liệu và sinh câu trả lời. Tìm đúng tài liệu không đảm bảo phần sinh chỉ dùng thông tin trong đó, vì LLM vẫn là mô hình dự đoán token và có thể sai.", draft: true }
   },
   {
     id: "Q04", topic: "Embedding", difficulty: "Trung bình",
@@ -94,7 +99,8 @@ window.QUESTION_BANK = [
     anchors: [
       { code: "T06-130", quote: "Cứ một từ — đơn giản hóa gọi một từ là một token — thì làm sao mỗi từ đấy chúng ta biểu diễn nó trong không gian..." }
     ],
-    anchor_confidence: "partial"
+    anchor_confidence: "partial",
+    concept: { title: "Embedding và tương đồng ngữ nghĩa", summary: "Embedding biến câu chữ thành vector sao cho câu cùng ý nằm gần nhau, dù dùng từ khác. Nhờ vậy truy hồi theo nghĩa thay vì chỉ khớp từ khoá.", draft: true }
   },
   {
     id: "Q05", topic: "Context Window", difficulty: "Trung bình",
@@ -116,7 +122,8 @@ window.QUESTION_BANK = [
       { code: "T04-052", quote: "Context rot: khi bạn càng đưa nhiều thông tin, càng đưa nhiều ngữ cảnh, thì cái mô hình càng ngày về sau nó sẽ càng kém đi, và nó sẽ thường quên những thông tin ở lúc đầu." },
       { code: "T06-149", quote: "Cái thứ ba là context window: mô hình chỉ nhìn được một lượng nhất định." }
     ],
-    anchor_confidence: "strong"
+    anchor_confidence: "strong",
+    concept: { title: "Context window là ngân sách chung", summary: "Mọi thứ đưa vào một lượt gọi (system prompt, lịch sử, tài liệu truy hồi) và cả phần trả lời đều chia chung một giới hạn token. Nhồi thêm tài liệu làm hết chỗ cho phần khác và mô hình dễ 'quên' đầu ngữ cảnh (context rot).", draft: true }
   },
   {
     id: "Q06", topic: "Tokenization", difficulty: "Dễ",
@@ -138,7 +145,8 @@ window.QUESTION_BANK = [
       { code: "T06-134", quote: "Đơn vị cơ bản của LLM là cái nãy giờ chúng ta gọi là token. Quá trình huấn luyện dữ liệu đầu vào trước đây chủ yếu dùng tiếng Anh." },
       { code: "T06-135", quote: "Cái LLM nó không đọc ký tự các bạn nhá... không đọc ký tự trái sang phải, cũng không đọc word by word." }
     ],
-    anchor_confidence: "strong"
+    anchor_confidence: "strong",
+    concept: { title: "Token không phải từ", summary: "LLM xử lý văn bản theo token, đơn vị nhỏ hơn hoặc khác với từ. Cách tách phụ thuộc tokenizer và ngôn ngữ; tiếng Việt thường tốn nhiều token hơn tiếng Anh cho cùng nội dung.", draft: true }
   },
   {
     id: "Q07", topic: "Temperature", difficulty: "Dễ",
@@ -158,7 +166,8 @@ window.QUESTION_BANK = [
     anchors: [
       { code: "T04-072", quote: "Nếu temperature bằng 0, mô hình sẽ luôn luôn lấy xác suất cao nhất... Nhưng khi bạn tăng temperature lên, nó sẽ random rộng hơn trong phạm vi đấy." }
     ],
-    anchor_confidence: "strong"
+    anchor_confidence: "strong",
+    concept: { title: "Temperature điều khiển độ ngẫu nhiên", summary: "Temperature thấp khiến mô hình thiên về token xác suất cao nhất nên kết quả ổn định hơn giữa các lần chạy. Ổn định không đồng nghĩa với đúng sự thật.", draft: true }
   },
   {
     id: "Q08", topic: "Transformer và Attention", difficulty: "Khó",
@@ -179,7 +188,8 @@ window.QUESTION_BANK = [
       { code: "T06-086", quote: "Cái self-attention bản chất là mỗi một token sẽ nhìn các token khác trong ngữ cảnh đang đặt ra." },
       { code: "T06-130", quote: "Cái cơ chế self-attention ở đây, hiểu một cách thân thiện: cứ một từ... thì làm sao mỗi từ đấy chúng ta biểu diễn nó trong không gian." }
     ],
-    anchor_confidence: "strong"
+    anchor_confidence: "strong",
+    concept: { title: "Self-attention", summary: "Mỗi token 'nhìn' các token khác trong ngữ cảnh và gán trọng số liên quan để xây biểu diễn của chính nó. Đây là cơ chế cốt lõi giúp Transformer hiểu quan hệ giữa các từ.", draft: true }
   },
   {
     id: "Q09", topic: "Fine-tuning + RAG", difficulty: "Trung bình",
@@ -199,7 +209,8 @@ window.QUESTION_BANK = [
     anchors: [
       { code: "T03-119", quote: "Nếu đụng đến fine-tuning, đa phần là các bạn đang cố deploy hệ thống vào một lĩnh vực ngách rất đặc thù." }
     ],
-    anchor_confidence: "partial"
+    anchor_confidence: "partial",
+    concept: { title: "Kết hợp fine-tuning và RAG", summary: "Fine-tuning phù hợp cho hành vi/phong cách ổn định; RAG phù hợp cho kiến thức thay đổi. Hai cơ chế giải quyết hai nhu cầu khác nhau và có thể dùng cùng lúc.", draft: true }
   },
   {
     id: "Q10", topic: "AI Agent", difficulty: "Dễ",
@@ -219,7 +230,8 @@ window.QUESTION_BANK = [
     anchors: [
       { code: "T04-073", quote: "Bây giờ chúng ta làm cho mô hình có tay, có chân, có bộ não, có thêm nhiều ngữ cảnh khác để làm được việc — đấy là con đường đi đến AI agent. Hiểu nôm na, nó không phải chỉ sinh văn bản nữa: nó có thể làm được việc, có thể tương tác với thế giới." }
     ],
-    anchor_confidence: "strong"
+    anchor_confidence: "strong",
+    concept: { title: "Chatbot và AI agent", summary: "Chatbot trả lời một lượt. Agent được giao mục tiêu, có thể gọi công cụ, quan sát kết quả rồi quyết định bước tiếp theo, lặp cho tới khi xong việc.", draft: true }
   },
   {
     id: "Q11", topic: "Agent Loop", difficulty: "Trung bình",
@@ -239,7 +251,8 @@ window.QUESTION_BANK = [
     anchors: [
       { code: "T04-073", quote: "Để làm được việc đấy, nó cần được gắn tay, gắn chân — kết nối với các công cụ, với thế giới bên ngoài." }
     ],
-    anchor_confidence: "partial"
+    anchor_confidence: "partial",
+    concept: { title: "Vòng lặp agent: quan sát cập nhật kế hoạch", summary: "Sau mỗi hành động, kết quả quan sát được cập nhật vào trạng thái và ảnh hưởng hành động kế tiếp. Agent không đi theo kịch bản cố định mà điều chỉnh theo thực tế.", draft: true }
   },
   {
     id: "Q12", topic: "Tool Calling", difficulty: "Dễ",
@@ -260,7 +273,8 @@ window.QUESTION_BANK = [
       { code: "T03-034", quote: "Khi detect được người dùng hỏi đếm số lượng chữ cái trong một từ, nó chỉ cần gọi một cái tool. Tool đấy viết bằng Python luôn." },
       { code: "T06-148", quote: "Bất lợi đầu tiên là knowledge cutoff: bao giờ nó cũng có cái mốc chặn trên về mặt tri thức." }
     ],
-    anchor_confidence: "strong"
+    anchor_confidence: "strong",
+    concept: { title: "Tool calling để lấy dữ liệu hiện tại", summary: "Kiến thức trong mô hình là tĩnh và có thể cũ. Khi cần thông tin thời gian thực hoặc phép tính chính xác, hệ thống nên gọi công cụ bên ngoài rồi đưa kết quả vào ngữ cảnh.", draft: true }
   },
   {
     id: "Q13", topic: "RAG vs Agent", difficulty: "Khó",
@@ -280,7 +294,8 @@ window.QUESTION_BANK = [
     anchors: [
       { code: "T04-073", quote: "Đấy là con đường đi đến AI agent. Hiểu nôm na, nó không phải chỉ sinh văn bản nữa: nó có thể làm được việc." }
     ],
-    anchor_confidence: "partial"
+    anchor_confidence: "partial",
+    concept: { title: "Workflow cố định và hành vi agentic", summary: "Pipeline cố định (như RAG chuẩn) luôn chạy cùng một chuỗi bước. Hệ thống agentic chọn bước tiếp theo dựa trên trạng thái và kết quả vừa quan sát, nên luồng chạy có thể rẽ nhánh.", draft: true }
   },
   {
     id: "Q14", topic: "Hallucination", difficulty: "Dễ",
@@ -301,7 +316,8 @@ window.QUESTION_BANK = [
       { code: "T06-138", quote: "LLM có thể sai, và trên thực tế không bao giờ có chuyện đúng 100%." },
       { code: "T04-047", quote: "Nó không phải là nó biết cái tri thức đấy, mà là nó đang dự đoán những từ tiếp theo." }
     ],
-    anchor_confidence: "strong"
+    anchor_confidence: "strong",
+    concept: { title: "Tự tin không phải bằng chứng", summary: "LLM có thể diễn đạt trôi chảy, chắc chắn nhưng vẫn sai. Mọi con số, sự kiện cần được kiểm tra với nguồn; không dùng giọng điệu để đánh giá độ đúng.", draft: true }
   },
   {
     id: "Q15", topic: "Prompt vs RAG vs Fine-tuning", difficulty: "Trung bình",
@@ -321,7 +337,8 @@ window.QUESTION_BANK = [
     anchors: [
       { code: "T03-119", quote: "Nếu đụng đến fine-tuning, đa phần là các bạn đang cố deploy hệ thống vào một lĩnh vực ngách rất đặc thù." }
     ],
-    anchor_confidence: "partial"
+    anchor_confidence: "partial",
+    concept: { title: "Prompt · RAG · Fine-tuning tác động ở ba lớp", summary: "Prompt điều chỉnh hành vi ngay trong lượt gọi; RAG đưa kiến thức bên ngoài vào ngữ cảnh; fine-tuning thay đổi trọng số để thích nghi sâu với một dạng việc.", draft: true }
   },
   {
     id: "Q16", topic: "Vector Database", difficulty: "Dễ",
@@ -339,7 +356,8 @@ window.QUESTION_BANK = [
       dataai: "Vector DB thực hiện nearest-neighbor retrieval trong embedding space dựa trên distance/similarity giữa query và document representations, có thể kết hợp filtering/reranking."
     },
     anchors: [],
-    anchor_confidence: "none"
+    anchor_confidence: "none",
+    concept: { title: "Vector database", summary: "Nơi lưu các vector embedding của từng đoạn tài liệu và tìm nhanh những đoạn gần nhất với câu hỏi theo độ tương đồng. Nó không sinh câu trả lời và không huấn luyện mô hình.", draft: true }
   },
   {
     id: "Q17", topic: "Chunking trong RAG", difficulty: "Trung bình",
@@ -359,7 +377,8 @@ window.QUESTION_BANK = [
     anchors: [
       { code: "T04-052", quote: "Context rot: khi bạn càng đưa nhiều thông tin, càng đưa nhiều ngữ cảnh, thì cái mô hình càng ngày về sau nó sẽ càng kém đi." }
     ],
-    anchor_confidence: "partial"
+    anchor_confidence: "partial",
+    concept: { title: "Chunking: cắt tài liệu đúng cỡ", summary: "Tài liệu được cắt thành đoạn trước khi embed. Đoạn quá lớn khiến truy hồi kém chính xác và đưa nhiều nội dung thừa vào ngữ cảnh; quá nhỏ làm mất mạch ý.", draft: true }
   },
   {
     id: "Q18", topic: "Agent + Human Approval", difficulty: "Trung bình",
@@ -379,7 +398,8 @@ window.QUESTION_BANK = [
     anchors: [
       { code: "T06-138", quote: "LLM có thể sai, và trên thực tế không bao giờ có chuyện đúng 100%." }
     ],
-    anchor_confidence: "partial"
+    anchor_confidence: "partial",
+    concept: { title: "Mức tự động hoá theo rủi ro", summary: "Hành động khó đảo ngược hoặc hậu quả lớn nên có người phê duyệt, dù AI đủ khả năng kỹ thuật. Mức tự chủ được quyết bởi chi phí khi sai, không bởi năng lực mô hình.", draft: true }
   },
   {
     id: "Q19", topic: "Model Evaluation", difficulty: "Trung bình",
@@ -397,7 +417,8 @@ window.QUESTION_BANK = [
       dataai: "Aggregate benchmark có thể khác target task distribution và objective. Cần estimate expected performance trên representative target distribution và xem cả metric, variance, contamination hay domain shift."
     },
     anchors: [],
-    anchor_confidence: "none"
+    anchor_confidence: "none",
+    concept: { title: "Đánh giá trên đúng workload", summary: "Điểm benchmark tổng quát không đảm bảo chất lượng cho bài toán cụ thể. Nên đo mô hình trên tập kiểm thử đại diện cho dữ liệu và yêu cầu thật của ứng dụng.", draft: true }
   },
   {
     id: "Q20", topic: "LLM + RAG + Agent", difficulty: "Khó",
@@ -418,6 +439,7 @@ window.QUESTION_BANK = [
       { code: "T04-073", quote: "Nó cần được gắn tay, gắn chân — kết nối với các công cụ, với thế giới bên ngoài." },
       { code: "T03-036", quote: "Dùng RAG cho một vài cái system nó tốt." }
     ],
-    anchor_confidence: "partial"
+    anchor_confidence: "partial",
+    concept: { title: "Ghép LLM, RAG và agent", summary: "Agent điều phối các bước, RAG cung cấp kiến thức cập nhật, công cụ/API cung cấp trạng thái và hành động bên ngoài. Mỗi thành phần giải quyết một phần của yêu cầu phức tạp.", draft: true }
   }
 ];

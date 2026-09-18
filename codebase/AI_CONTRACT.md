@@ -36,7 +36,8 @@ Ràng buộc cứng (đây là các case trong `eval/golden_set.json`):
     "anchor_confidence": "strong" | "partial" | "none"
   },
   "learner_answer": "A" | null,
-  "attempt": 1,                       // lần thử thứ mấy với câu này
+  "attempt": 1,                       // luôn 1 ở UI hiện tại (không chọn lại); giữ để eval mô phỏng lịch sử
+  "hint_viewed": false,               // đã mở gợi ý sinh sẵn trước khi nộp
   "history": [ { "question_id": "Q06", "answer": "A", "verdict": "incorrect" } ],  // lỗi trước đó trong phiên
   "followup_text": "…",               // chỉ khi mode = followup
   "learner_explanation": "…"          // chỉ khi mode = probe
@@ -73,12 +74,33 @@ Ràng buộc cứng (đây là các case trong `eval/golden_set.json`):
 }
 ```
 
-## 4. Việc cần làm trong `server/server.js`
+Hành vi UI liên quan (theo VLearn thật): **"Kiểm tra" = nộp câu**, đáp án bị khoá, không có chọn lại. Con đường sửa sai duy nhất là `retry_question`. Vì vậy `retry_question` là **bắt buộc** khi `verdict = "incorrect"` (mode diagnose). Request có thêm `hint_viewed: boolean` (học viên đã mở gợi ý sinh sẵn trước khi nộp) — có thể dùng để điều chỉnh mức gợi ý bậc 1.
 
-1. Điền `callModel({ system, user })` → trả về **chuỗi thô** từ model (provider tuỳ chọn, đặt key trong `.env`).
-2. Giữ nguyên `buildPrompt()` (hoặc sửa trong `prompt.js`) và `parseModelJson()`.
+## 3b. Mode `"hint"` — offline, chạy một lần (không qua UI)
+
+`node codebase/server/scripts/generate-hints.js` gọi model cho **20 câu × 3 persona** và ghi `codebase/js/data.hints.js`. UI đọc file này khi học viên bấm "Xem gợi ý" trước khi nộp → **không tốn lời gọi lúc học**.
+
+- Prompt (`buildHintPrompt` trong `prompt.js`) **không chứa đáp án đúng**, chỉ stem + options + persona.
+- Response: `{ "hint": "…" }` (≤ 2 câu, không nhắc A/B/C/D, không loại trừ phương án).
+- Script tự gắn `flagged: true` nếu hint chứa nội dung phương án đúng → nhóm đọc tay trước khi demo.
+- Log: `server/logs/hints-YYYY-MM-DD.jsonl`. Script dừng và **không ghi đè** file khi `callModel()` chưa cấu hình.
+
+## 3c. `POST /api/feedback` — phản hồi của học viên (không cần model)
+
+```jsonc
+{ "trace_id": "call_…", "question_id": "Q07", "persona": "nonit", "mode": "diagnose",
+  "block": "level1" | "level2" | "followup" | "probe",
+  "rating": "up" | "down", "reasons": ["level","wrong_diagnosis","too_long","wrong_fact"], "note": "…" }
+```
+Server append vào `server/logs/feedback.jsonl`. UI luôn ghi thêm vào trace (`user_feedback`) kể cả khi MOCK/offline. Dữ liệu này là bằng chứng "AI có phù hợp không" cho CP5, đối chiếu với `trace_id` để xem đúng prompt/response bị chê.
+
+## 4. Việc cần làm
+
+1. Điền `callModel({ system, user })` trong **`server/model.js`** → trả về **chuỗi thô** từ model (provider tuỳ chọn, key trong `.env`). Đây là chỗ duy nhất; server và script hint đều dùng chung.
+2. Giữ nguyên `buildPrompt()` (hoặc sửa trong `prompt.js`, tăng `PROMPT_VERSION`) và `parseModelJson()`.
 3. Chạy `node codebase/server/server.js` → mở `http://localhost:8787` → trên UI bấm ⚙ chọn **LIVE**.
-4. Log server tự ghi `codebase/server/logs/YYYY-MM-DD.jsonl` (prompt + raw). UI cũng có nút xuất trace JSONL.
+4. Chạy `node codebase/server/scripts/generate-hints.js --only Q07` để thử, rồi chạy không tham số cho cả bộ; đọc các mục `flagged`.
+5. Log server tự ghi `codebase/server/logs/YYYY-MM-DD.jsonl` (prompt + raw). UI cũng có nút xuất trace JSONL.
 
 ## 5. Đo lượt 1
 
