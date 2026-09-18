@@ -157,7 +157,7 @@ Loại: [x] Tính năng mới
   - Nguyễn Hoàng Cường - Học viên profile Data/AI
   - Văn Thành Huy - Học viên profile IT/Dev
   - Nguyễn Tiến Phát - Học viên profile Non-IT
-  - Kế hoạch vòng validation: cho mỗi bạn làm 1 mini-flow 3 câu (1 câu sai để test hint, 1 câu sửa sau hint, 1 câu survey để đánh giá độ phù hợp profile), log thời gian và mức độ hiểu.
+  - Kế hoạch và kết quả vòng validation: đã thực hiện đo kiểm thực tế trên 4 bạn (gồm willing user Nguyễn Hoàng Cường + 3 bạn ngoài nhóm Minh Tâm, Khánh Linh, Viết Đức) theo chuẩn 4.2. Bảng log chi tiết và 4 dòng tổng hợp xem tại [`validation/user-validation.md`](validation/user-validation.md). Kết quả: 100% đánh giá giải thích dễ hiểu; phát hiện mâu thuẫn nhận thức đắt giá giữa Dev (thấy đề quá dễ) và Non-tech (thấy 10 câu đều quá khó), đo được độ trễ thật ~10s/câu.
 
 - Multi-prototype (nếu làm):
   - Không triển khai multi-prototype trong scope hiện tại; nhóm tập trung production pipeline Qwen local và một flow chính để đo ổn định.
