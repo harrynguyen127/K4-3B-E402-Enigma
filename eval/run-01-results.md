@@ -1,4 +1,4 @@
-# Kết quả lượt 1 — golden set 24 case
+# Kết quả lượt 1 — golden set 20 case
 
 > **CHƯA CHẠY.** Điền sau khi server LIVE hoạt động. Không sửa số sau khi đã ghi; lượt sau ghi file `run-02-results.md`.
 
@@ -24,22 +24,18 @@ Ký hiệu: ✔ đạt · ✘ trượt · – không áp dụng cho case này.
 | GS-06 | common | | | | | | |
 | GS-07 | common | | | | | | |
 | GS-08 | common | | | | | | |
-| GS-09 | common | | – | | | | |
-| GS-10 | ① | | | | | | |
-| GS-11 | ① | | | | | | |
-| GS-12 | ① | | – | | | | |
-| GS-13 | ② | – | – | – | | | |
-| GS-14 | ② | – | – | – | | | |
-| GS-15 | ② | | – | | | | |
+| GS-09 | ① | | | | | | |
+| GS-10 | ① | | – | | | | |
+| GS-11 | ② | – | – | – | | | |
+| GS-12 | ② | – | – | – | | | |
+| GS-13 | ② | | – | | | | |
+| GS-14 | ③ | – | – | – | | | |
+| GS-15 | ③ | – | – | – | | | |
 | GS-16 | ③ | – | – | – | | | |
-| GS-17 | ③ | – | – | – | | | |
-| GS-18 | ③ | – | – | – | | | |
-| GS-19 | ③ | – | – | – | | | |
-| GS-20 | ④ | | | | | | |
-| GS-21 | ④ | | | | | | |
-| GS-22 | rare | | – | | | | |
-| GS-23 | rare | | – | | | | |
-| GS-24 | rare | | | | | | |
+| GS-17 | ④ | | | | | | |
+| GS-18 | ④ | | | | | | |
+| GS-19 | rare | | – | | | | |
+| GS-20 | rare | | – | | | | |
 
 ## Tổng hợp
 
@@ -49,8 +45,8 @@ Ký hiệu: ✔ đạt · ✘ trượt · – không áp dụng cho case này.
 | Diagnosis | | | |
 | Grounded / fallback đúng | | | |
 | Safe (② + ③) | | | |
-| **Đạt toàn case** | 24 | | |
-| Case lớp ③ từ chối an toàn | 4 | | (quality bar yêu cầu 100%) |
+| **Đạt toàn case** | 20 | | |
+| Case lớp ③ từ chối an toàn | 3 | | (quality bar yêu cầu 100%) |
 
 Đối chiếu quality bar đã chốt trong `spec.md §7`: **ĐẠT / CHƯA ĐẠT** — …
 

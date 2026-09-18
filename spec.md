@@ -129,8 +129,8 @@ Loại: [x] Tính năng mới
   - Grounded feedback rate: % phản hồi có căn cứ từ bài học và ví dụ tương ứng.
   - Safe fallback rate: % trường hợp thiếu thông tin nhưng không bịa hoặc ép profile sai.
 
-- Golden set (`eval/golden_set.json` — bản nháp 0.1, 24 case, cần review; định nghĩa đạt và cơ cấu trong `eval/README.md`, lưới phủ trong `eval/user-input-grid.md`):
-  - Cơ cấu theo guide §2.6: ① 3 case · ② 3 case · ③ 4 case · ④ 2 case · thường gặp 9 · hiếm 3; **15/24 case phát triển từ chatlog thật** (ghi `turn_id`).
+- Golden set (`eval/golden_set.json` — bản nháp 0.1, 20 case, cần review; định nghĩa đạt và cơ cấu trong `eval/README.md`, lưới phủ trong `eval/user-input-grid.md`):
+  - Cơ cấu theo guide §2.6: ① 2 case · ② 3 case · ③ 3 case · ④ 2 case · thường gặp 8 · hiếm 2; **15/20 case phát triển từ chatlog thật** (ghi `turn_id`).
   - Mỗi case gồm: `request` (mode, persona, question_id, learner_answer, followup_text/learner_explanation, attempt, history) và `expected` (verdict, must, must_not) theo `codebase/AI_CONTRACT.md`.
   - Ngân hàng 20 câu + lời giải mẫu 3 persona + mã đoạn transcript được phép trích dẫn: `codebase/js/data.questions.js` (Q16, Q19 không có transcript tương ứng — dùng làm case lớp ①).
 
@@ -146,9 +146,9 @@ Loại: [x] Tính năng mới
 
 | Lần chạy | Số case | Profile alignment | Recovery rate | Grounded/fallback đúng | Ghi chú |
 |---|---:|---:|---:|---:|---|
-| Baseline | 24 | TBD | TBD | TBD | Chưa có phân nhóm profile, dùng feedback chung |
-| Iteration 1 | 24 | TBD | TBD | TBD | Thêm profile mapping + personalized hint ladder |
-| Iteration 2 | 24 | TBD | TBD | TBD | Tinh chỉnh prompt theo 3 nhóm và fallback low-confidence |
+| Baseline | 20 | TBD | TBD | TBD | Chưa có phân nhóm profile, dùng feedback chung |
+| Iteration 1 | 20 | TBD | TBD | TBD | Thêm profile mapping + personalized hint ladder |
+| Iteration 2 | 20 | TBD | TBD | TBD | Tinh chỉnh prompt theo 3 nhóm và fallback low-confidence |
 
 ## §8. Phân công & kế hoạch
 - Phân công có tên:
@@ -175,7 +175,7 @@ Loại: [x] Tính năng mới
 | 17/09/2026 | Chuyển trọng tâm từ adaptive quiz feedback chung sang profile-aware personalized learning | Đề bài của nhóm xác định rõ: mỗi học viên có background nghề nghiệp khác nhau và nên nhận câu hỏi, ví dụ, phản hồi khác nhau dù cùng kiến thức |
 | 17/09/2026 | Thêm profile map Data/AI, IT/Dev, Non-IT vào golden set và prompt logic | Duy trì tính phù hợp với khóa học K4 và các nhóm học viên khác nhau |
 | 18/09/2026 | Dựng khung CP3: `codebase/index.html` (luồng 4 bước, ladder gợi ý→giải thích→làm lại, trace), `server/` proxy + log, `AI_CONTRACT.md`; giữ `prototype.html` làm bản CP2 | vlearn_cp3.md yêu cầu ≥1 lời gọi AI thật tại quyết định trung tâm + log prompt/raw; tách UI khỏi AI để AI Engineer ghép độc lập |
-| 18/09/2026 | Golden set nháp 24 case trong `eval/` theo 4 lớp chỗ khó + User Input Grid; 15 case từ chatlog K4 (T10472, T10471, T10451, T10509, T10729, T11237, T11043, T11736, T12701, T10318, T10814, T10330, T11020, T10687, T10441) | Thay cơ cấu cũ "8 case/persona" (không phủ 4 lớp) bằng cơ cấu guide §2.6 |
+| 18/09/2026 | Golden set nháp 20 case trong `eval/` theo 4 lớp chỗ khó + User Input Grid; 15 case từ chatlog K4 (T10472, T10471, T10451, T10509, T10729, T11237, T11043, T11736, T12701, T10318, T10814, T10330, T11020, T10687, T10441) | Thay cơ cấu cũ "8 case/persona" (không phủ 4 lớp) bằng cơ cấu guide §2.6 |
 | 18/09/2026 | Gắn mã đoạn transcript thật cho từng câu (`anchors`, `anchor_confidence`); phát hiện transcript **không có** đoạn về vector DB/embedding/chunking | Tránh AI bịa trích dẫn (lớp ①): chỉ được trích trong danh sách anchors, không có thì nói rõ |
 | 18/09/2026 | Khoá đáp án sau "Kiểm tra" (bỏ "Tôi tự sửa → chọn lại"); pill 1–20 + progress; gợi ý trước-nộp ẩn mặc định, sinh sẵn bằng AI batch; sidebar Tiến độ + Kiến thức đang luyện | Đối chiếu giao diện VLearn thật (ảnh teamlead gửi): nút Kiểm tra là nộp câu; tiết kiệm token so với gọi AI mỗi lần bấm gợi ý |
 | 18/09/2026 | Thêm phản hồi học viên 👍/👎 + 4 lý do trên từng khối AI, lưu `feedback.jsonl` + trace | Cần dữ liệu "AI có phù hợp với trình độ không" từ người dùng thật cho CP5, đối chiếu được với prompt/response |
