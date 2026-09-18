@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Học từ lỗi theo hồ sơ — Enigma D2 · CP3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== TOPBAR ===== -->
+  <div class="topbar">
+    <div class="titles">
+      <div class="eyebrow">Đề D2 · Học từ lỗi trước · Nhóm Enigma · CP3 prototype</div>
+      <h1>Cùng một câu hỏi, cùng một đáp án đúng — lời giảng theo đúng hồ sơ của bạn</h1>
+      <div class="subtitle">Học viên làm câu hỏi trước. Khi sai, AI chỉ ra đúng giả định đang nhầm, gợi ý một bước, rồi mới giải thích theo nền tảng nghề nghiệp (Non-IT · Data/AI · IT/Dev), kèm trích dẫn transcript buổi học.</div>
+    </div>
+    <div class="actions">
+      <button class="mode-badge mock" id="mode-badge" title="Đổi chế độ MOCK / LIVE"><span class="dot"></span><span id="mode-label">MOCK — chưa gọi AI thật</span></button>
+      <button class="btn" id="btn-trace">Trace <span id="trace-count" class="small">(0)</span></button>
+      <button class="btn ghost" id="btn-settings" title="Cài đặt AI">⚙</button>
+    </div>
+  </div>
+
+  <div class="note" id="mock-note">Đang ở chế độ <b>MOCK</b>: nội dung giải thích lấy từ lời giải mẫu của nhóm, <b>không phải</b> AI thật. Bấm ⚙ → LIVE khi server đã cấu hình (xem <code>codebase/AI_CONTRACT.md</code>).</div>
+
+  <!-- ===== STEPPER ===== -->
+  <div class="stepper" id="stepper">
+    <div class="step" data-step="1"><span class="num">1</span> Hồ sơ học viên</div>
+    <div class="step" data-step="2"><span class="num">2</span> Làm bài trước</div>
+    <div class="step" data-step="3"><span class="num">3</span> Học từ lỗi (AI)</div>
+    <div class="step" data-step="4"><span class="num">4</span> Làm lại & giải thích lại</div>
+  </div>
+
+  <div class="grid">
+    <!-- ===== MAIN ===== -->
+    <div class="stack" id="main">
+
+      <!-- STEP 1: persona -->
+      <section class="card pad stack" id="sec-persona">
+        <div>
+          <div class="label">Bước 1 · Hồ sơ học viên</div>
+          <h2 style="font-size:20px;margin-top:4px;">Bạn đến từ nền tảng nào?</h2>
+          <div class="small">Ngoài đời, hồ sơ lấy từ CV/onboarding. Trong demo, chọn tay để so sánh. Chọn "Chưa rõ" để xem hệ thống hỏi lại thay vì đoán.</div>
+        </div>
+        <div class="persona-grid" id="persona-grid"></div>
+      </section>
+
+      <!-- STEP 2: question -->
+      <section class="card pad stack" id="sec-quiz" hidden>
+        <div class="q-head">
+          <div>
+            <div class="label">Bước 2 · Làm bài trước khi được giảng</div>
+            <div class="row" style="margin-top:6px;">
+              <select id="q-select" aria-label="Chọn câu hỏi"></select>
+              <span class="diff" id="q-diff"></span>
+            </div>
+          </div>
+          <div class="small" id="q-attempt"></div>
+        </div>
+        <div class="small" id="q-topic"></div>
+        <div class="stem" id="q-stem"></div>
+        <div class="options" id="q-options"></div>
+        <div class="footer-actions">
+          <button class="btn ghost" id="btn-back-persona">← Đổi hồ sơ</button>
+          <button class="btn primary" id="btn-check" disabled>Kiểm tra</button>
+        </div>
+      </section>
+
+      <!-- STEP 3: AI feedback -->
+      <section class="stack" id="sec-ai" hidden></section>
+
+      <!-- follow-up -->
+      <section class="card pad stack" id="sec-followup" hidden>
+        <div>
+          <div class="label">Hỏi thêm về câu này</div>
+          <div class="small">Dùng để thử lớp ③: hỏi về deadline, điểm, link, "bạn là model gì"… hệ thống phải từ chối lịch sự.</div>
+        </div>
+        <div class="row">
+          <input type="text" id="followup-text" style="flex:1;min-width:220px;" placeholder="VD: cho ví dụ thực tế trong ngành kế toán · hoặc · deadline nộp lab là khi nào?">
+          <button class="btn" id="btn-followup">Gửi</button>
+        </div>
+        <div id="followup-out"></div>
+      </section>
+
+      <!-- STEP 4: retry -->
+      <section class="card pad stack" id="sec-retry" hidden></section>
+    </div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sb">
+      <div class="sb-profile" id="sb-profile" style="background:var(--unknown)">
+        <div class="label" style="color:rgba(255,255,255,.8)">Đang xem theo góc nhìn</div>
+        <div style="font-size:18px;font-weight:700;margin-top:2px;" id="sb-profile-name">Chưa chọn</div>
+        <div style="font-size:12px;opacity:.85;margin-top:2px;" id="sb-profile-desc">Chọn hồ sơ ở bước 1.</div>
+      </div>
+      <div class="sb-card">
+        <div class="label">Chỉ số học (phiên này)</div>
+        <div class="stat"><span>Câu đã kiểm tra</span><b id="st-checked">0</b></div>
+        <div class="stat"><span>Sai ở lần 1</span><b id="st-wrong">0</b></div>
+        <div class="stat"><span>Sửa đúng sau gợi ý</span><b id="st-recovered">0</b></div>
+        <div class="stat"><span>Đúng câu làm lại</span><b id="st-retry-ok">0</b></div>
+        <div class="stat"><span>TG đến lời giải (TB)</span><b id="st-time">—</b></div>
+        <div class="small">Đây là chỉ số "học được" mà track D yêu cầu — không chỉ "AI trả lời đúng".</div>
+      </div>
+      <div class="sb-card">
+        <div class="label">Nguồn trích dẫn</div>
+        <div class="small" id="sb-anchors">Chọn câu hỏi để xem AI được phép trích dẫn đoạn nào.</div>
+      </div>
+      <div class="sb-card">
+        <div class="label">Tệp liên quan</div>
+        <div class="small">Bản CP2: <a href="prototype.html">prototype.html</a><br>Hợp đồng AI: <code>AI_CONTRACT.md</code><br>Golden set: <code>../eval/golden_set.json</code></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="footer">Nhóm Enigma · K4-3B-E402 · Dữ liệu trích dẫn từ data/vlearn-pack (chỉ dùng trong hackathon).</div>
+</div>
+
+<!-- ===== TRACE DRAWER ===== -->
+<div class="drawer" id="drawer">
+  <div class="dh">
+    <h3>Trace lời gọi AI</h3>
+    <button class="btn sm" id="btn-export">Xuất JSONL</button>
+    <button class="btn sm danger" id="btn-clear">Xoá</button>
+    <button class="btn sm ghost" id="btn-close-drawer">✕</button>
+  </div>
+  <div class="small" style="padding:8px 20px 0;">Mỗi mục = 1 lời gọi: request → prompt → phản hồi thô → JSON đã parse. Ô "Chấm nhanh" dùng khi đo tay golden set.</div>
+  <div class="db" id="trace-list"></div>
+</div>
+
+<!-- ===== SETTINGS MODAL ===== -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h3 style="font-size:18px;">Cài đặt lời gọi AI</h3>
+    <label class="radio-row" id="rr-mock"><input type="radio" name="prov" value="mock"><div><b>MOCK</b> — không gọi model; dùng lời giải mẫu. Chỉ để dựng UX/demo dự phòng.</div></label>
+    <label class="radio-row" id="rr-live"><input type="radio" name="prov" value="live"><div><b>LIVE</b> — gọi <code>POST /api/explain</code> trên server (<code>codebase/server/server.js</code>).</div></label>
+    <div>
+      <div class="label">Endpoint server</div>
+      <input type="text" id="endpoint" style="width:100%;margin-top:6px;" placeholder="http://localhost:8787">
+    </div>
+    <div class="row">
+      <button class="btn sm" id="btn-health">Kiểm tra server</button>
+      <span class="small" id="health-out"></span>
+    </div>
+    <div class="footer-actions">
+      <span></span>
+      <button class="btn primary" id="btn-save-settings">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/data.questions.js"></script>
+<script src="js/data.personas.js"></script>
+<script src="js/trace.js"></script>
+<script src="js/ai-client.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
