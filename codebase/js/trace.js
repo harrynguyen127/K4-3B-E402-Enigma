@@ -57,6 +57,14 @@ window.Trace = (function () {
       persist();
     },
 
+    /** Sự kiện hành vi không phải lời gọi AI (mở gợi ý, mở giải thích đầy đủ). Gắn vào lời gọi nếu có trace_id. */
+    event(ev) {
+      const e = ev.trace_id ? entries.find(x => x.id === ev.trace_id) : null;
+      if (e) { (e.events = e.events || []).push(ev); }
+      else { entries.push({ id: "evt_" + Date.now().toString(36), ts: ev.at || new Date().toISOString(), mode: "EVENT", provider: null, request: { mode: ev.event, question: { id: ev.question_id }, persona: ev.persona }, event: ev, prompt: null, raw_response: null, parsed: ev, latency_ms: null, error: null, eval: null, user_feedback: null }); }
+      persist();
+    },
+
     clear() { entries = []; persist(); },
 
     exportJSONL() {

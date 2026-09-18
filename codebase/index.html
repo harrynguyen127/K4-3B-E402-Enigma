@@ -31,8 +31,7 @@
   <div class="stepper" id="stepper">
     <div class="step" data-step="1"><span class="num">1</span> Hồ sơ học viên</div>
     <div class="step" data-step="2"><span class="num">2</span> Nộp câu trả lời</div>
-    <div class="step" data-step="3"><span class="num">3</span> Học từ lỗi (AI)</div>
-    <div class="step" data-step="4"><span class="num">4</span> Làm lại & giải thích lại</div>
+    <div class="step" data-step="3"><span class="num">3</span> Học từ lỗi (AI) & giải thích lại</div>
   </div>
 
   <div class="grid">
@@ -44,7 +43,7 @@
         <div>
           <div class="label">Bước 1 · Hồ sơ học viên</div>
           <h2 style="font-size:20px;margin-top:4px;">Bạn đến từ nền tảng nào?</h2>
-          <div class="small">Ngoài đời, hồ sơ lấy từ CV/onboarding. Trong demo, chọn tay để so sánh. Chọn "Chưa rõ" để xem hệ thống hỏi lại thay vì đoán.</div>
+          <div class="small">Hồ sơ xác định qua các câu tự đánh giá lúc onboarding. Nếu chưa có thông tin chắc chắn, bạn tự chọn nhóm của mình tại đây và đổi lại bất cứ lúc nào trong cài đặt. Chọn "Chưa rõ" nếu muốn hệ thống hỏi lại trước khi giải thích.</div>
         </div>
         <div class="persona-grid" id="persona-grid"></div>
       </section>
@@ -98,8 +97,6 @@
         <div id="followup-out"></div>
       </section>
 
-      <!-- STEP 4: retry -->
-      <section class="card pad stack" id="sec-retry" hidden></section>
     </div>
 
     <!-- ===== SIDEBAR ===== -->
@@ -125,7 +122,7 @@
         <div class="stat"><span>Câu đã nộp</span><b id="st-checked">0</b></div>
         <div class="stat"><span>Sai ở lần nộp</span><b id="st-wrong">0</b></div>
         <div class="stat"><span>Đã xem gợi ý trước nộp</span><b id="st-hint">0</b></div>
-        <div class="stat"><span>Đúng câu làm lại sau khi sai</span><b id="st-retry-ok">0</b></div>
+        <div class="stat"><span>Bấm xem giải thích đầy đủ</span><b id="st-full">0</b></div>
         <div class="stat"><span>TG đến lời giải (TB)</span><b id="st-time">—</b></div>
         <div class="stat"><span>Phản hồi 👍 / 👎</span><b><span id="st-up">0</span> / <span id="st-down">0</span></b></div>
         <div class="small">Đây là chỉ số "học được" mà track D yêu cầu — không chỉ "AI trả lời đúng".</div>
@@ -136,7 +133,7 @@
       </div>
       <div class="sb-card">
         <div class="label">Tệp liên quan</div>
-        <div class="small">Bản CP2: <a href="prototype.html">prototype.html</a><br>Hợp đồng AI: <code>AI_CONTRACT.md</code><br>Golden set: <code>../eval/golden_set.json</code></div>
+        <div class="small">Đổi nhóm hồ sơ: bấm <b>← Đổi hồ sơ</b> bất kỳ lúc nào.<br>Bản CP2: <a href="prototype.html">prototype.html</a><br>Hợp đồng AI: <code>AI_CONTRACT.md</code><br>Golden set: <code>../eval/golden_set.json</code></div>
       </div>
     </aside>
   </div>

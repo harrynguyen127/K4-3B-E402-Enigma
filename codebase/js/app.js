@@ -1,5 +1,5 @@
 /* =====================================================================
- * APP — luồng demo CP3 (D2: nộp câu trước → sai → chẩn đoán → gợi ý → giải thích → làm lại)
+ * APP — luồng demo CP3 (D2: nộp câu trước → sai → chẩn đoán → gợi ý → giải thích đầy đủ → giải thích lại bằng lời mình)
  * Hành vi theo VLearn thật: "Kiểm tra" = nộp câu, đáp án bị khoá; gợi ý trước-khi-nộp
  * mặc định ẩn (lấy từ HINT_BANK sinh sẵn); sidebar có Tiến độ + Kiến thức đang luyện.
  * Không chứa logic AI; mọi quyết định AI đi qua AI.explain() (js/ai-client.js).
@@ -28,10 +28,10 @@
     busy: false, error: null,
     history: [],            // [{question_id, answer, verdict}]
     tStart: null,
-    retry: null,            // {question, answer, checked}
+    level1At: null,         // thời điểm hiện bậc 1 (đo số giây trước khi bấm xem đầy đủ)
     submitted: {},          // qIndex -> "correct" | "incorrect"
     feedback: {},           // block key -> {rating, reasons[], note, sent}
-    stats: { checked: 0, wrong: 0, hint: 0, retryOk: 0, times: [], up: 0, down: 0 }
+    stats: { checked: 0, wrong: 0, hint: 0, full: 0, times: [], up: 0, down: 0 }
   };
   const q = () => BANK[state.qIndex];
 
@@ -85,7 +85,7 @@
 
     const s = state.stats;
     $("st-checked").textContent = s.checked; $("st-wrong").textContent = s.wrong; $("st-hint").textContent = s.hint;
-    $("st-retry-ok").textContent = s.retryOk; $("st-up").textContent = s.up; $("st-down").textContent = s.down;
+    $("st-full").textContent = s.full; $("st-up").textContent = s.up; $("st-down").textContent = s.down;
     $("st-time").textContent = s.times.length ? Math.round(s.times.reduce((a, b) => a + b, 0) / s.times.length) + " s" : "—";
 
     $("sb-anchors").innerHTML = cur.anchors.length
@@ -220,7 +220,7 @@
       pieces.push(`<div class="card pad stack"><div class="ai-block level1">${aiHeader("Bậc 1 · Bạn đang nhầm ở đâu?", "chẩn đoán lỗi", ai)}
         <div><b>Giả định đang sai:</b> ${esc(ai.misconception || "(AI không trả về)")}</div>
         <div><b>Gợi ý (${esc(personaName())}):</b> ${esc(ai.hint || "(AI không trả về)")}</div>
-        ${state.level < 2 ? `<div class="row"><button class="btn primary sm" id="btn-need-more">Xem giải thích đầy đủ</button><span class="small">Thử tự nghĩ lại trước — bạn sẽ được làm một câu tương tự ở bước sau.</span></div>` : ""}
+        ${state.level < 2 ? `<div class="row"><button class="btn primary sm" id="btn-need-more">Xem giải thích đầy đủ</button><span class="small">Thử tự nghĩ lại với gợi ý trước. Việc bạn bấm nút này được ghi lại để nhóm biết bản ngắn đã đủ dễ hiểu chưa.</span></div>` : ""}
         ${fbHtml("level1")}
       </div></div>`);
     }
@@ -230,7 +230,6 @@
         ${citeHtml(ai)}
         <div class="small">Đáp án đúng: <b>${cur.correct}</b> — giống nhau cho mọi hồ sơ; chỉ cách giải thích thay đổi. <a href="#" id="lnk-compare">So sánh với hồ sơ khác</a></div>
         <div id="compare-out"></div>
-        ${!correct && ai.retry_question ? `<div class="row"><button class="btn primary sm" id="btn-go-retry">Làm câu tương tự để chắc đã hiểu →</button></div>` : ""}
         ${correct ? `<div class="stack" style="margin-top:6px;"><div class="label">Giải thích lại bằng lời của bạn (kiểm tra hiểu thật, không đoán)</div><textarea id="probe-text" placeholder="Vì sao đáp án ${cur.correct} đúng và các phương án kia sai?"></textarea><div class="row"><button class="btn sm" id="btn-probe">Gửi cho AI kiểm tra</button><span id="probe-out" class="small"></span></div><div id="probe-fb"></div></div>` : ""}
         ${fbHtml("level2")}
       </div></div>`);
@@ -238,8 +237,12 @@
     sec.innerHTML = pieces.join("");
     wireFeedback(sec, (key) => ({ trace_id: state.ai?._trace_id, mode: "diagnose", block: key }));
 
-    $("btn-need-more") && ($("btn-need-more").onclick = () => { state.level = 2; recordTime(); render(); });
-    $("btn-go-retry") && ($("btn-go-retry").onclick = () => { state.retry = { question: ai.retry_question, answer: null, checked: false }; goStep(4); });
+    $("btn-need-more") && ($("btn-need-more").onclick = () => {
+      state.level = 2; state.stats.full += 1; recordTime();
+      const secs = state.level1At ? Math.round((Date.now() - state.level1At) / 1000) : null;
+      window.AI.logEvent({ event: "open_full_explanation", trace_id: state.ai?._trace_id, question_id: q().id, persona: state.persona, seconds_on_level1: secs, hint_viewed: state.hintViewed });
+      render();
+    });
     $("lnk-compare") && ($("lnk-compare").onclick = (e) => { e.preventDefault(); $("compare-out").innerHTML = ["nonit", "dev", "dataai"].filter(k => k !== state.persona).map(k => `<div class="ai-block" style="margin-top:8px;"><span class="tag" style="color:${pColor(k)}"><span class="dot" style="background:${pColor(k)}"></span>${P[k].name} (lời giải mẫu của nhóm)</span><div>${esc(cur.reference[k])}</div></div>`).join(""); });
     $("btn-probe") && ($("btn-probe").onclick = runProbe);
   }
@@ -261,6 +264,7 @@
         state.history.push({ question_id: q().id, answer: state.answer, verdict: ai.verdict });
         if (ai.verdict === "correct") recordTime();
         state.level = ai.verdict === "correct" ? 2 : 1;
+        state.level1At = ai.verdict === "correct" ? null : Date.now();
         if (state.step < 3) state.step = 3;
         show($("sec-followup"), true);
       }
@@ -293,32 +297,17 @@
     renderTrace();
   }
 
-  /* ---------- step 4: retry ---------- */
-  function renderRetry() {
-    const sec = $("sec-retry");
-    if (state.step !== 4 || !state.retry) { show(sec, false); return; }
-    show(sec, true);
-    const r = state.retry, rq = r.question;
-    sec.innerHTML = `<div><div class="label">Bước 4 · Câu tương tự (AI sinh theo hồ sơ ${esc(personaName())})</div><div class="stem" style="margin-top:6px;">${esc(rq.stem)}</div></div>
-      <div class="options">${Object.entries(rq.options).map(([k, v]) => { let cls = "option"; if (r.checked) { cls += " locked"; if (k === rq.correct) cls += " correct"; else if (k === r.answer) cls += " wrong"; } else if (k === r.answer) cls += " selected"; return `<button class="${cls}" data-k="${k}" ${r.checked ? "disabled" : ""}><span class="badge">${k}</span><span>${esc(v)}</span></button>`; }).join("")}</div>
-      ${r.checked ? `<div class="banner ${r.answer === rq.correct ? "ok" : "warn"}">${r.answer === rq.correct ? "✔ Đúng — bạn đã sửa được lỗi ban đầu." : "Chưa đúng. Quay lại đọc giải thích rồi thử câu khác nhé."}</div>` : ""}
-      <div class="footer-actions"><button class="btn ghost" id="btn-retry-back">← Xem lại giải thích</button><div class="row">${r.checked ? `<button class="btn primary" id="btn-next-q">Câu tiếp theo →</button>` : `<button class="btn primary" id="btn-retry-check" ${r.answer ? "" : "disabled"}>Kiểm tra</button>`}</div></div>`;
-    sec.querySelectorAll(".option").forEach(b => b.onclick = () => { if (!r.checked) { r.answer = b.dataset.k; render(); } });
-    $("btn-retry-back").onclick = () => goStep(3);
-    $("btn-retry-check") && ($("btn-retry-check").onclick = () => { r.checked = true; if (r.answer === rq.correct) { state.stats.retryOk += 1; recordTime(); } render(); });
-    $("btn-next-q") && ($("btn-next-q").onclick = () => nextQuestion());
-  }
 
   /* ---------- navigation ---------- */
   function goStep(n) {
     state.step = n;
     show($("sec-persona"), n === 1);
-    show($("sec-quiz"), n >= 2 && n !== 4);
+    show($("sec-quiz"), n >= 2);
     show($("sec-followup"), n === 3 && state.checked);
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  function resetQuestion() { state.answer = null; state.checked = false; state.hintOpen = false; state.hintViewed = false; state.ai = null; state.level = 0; state.error = null; state.retry = null; state.tStart = null; state.feedback = {}; $("followup-out").innerHTML = ""; $("followup-text").value = ""; }
+  function resetQuestion() { state.answer = null; state.checked = false; state.hintOpen = false; state.hintViewed = false; state.ai = null; state.level = 0; state.error = null; state.level1At = null; state.tStart = null; state.feedback = {}; $("followup-out").innerHTML = ""; $("followup-text").value = ""; }
   function nextQuestion() { if (state.qIndex < BANK.length - 1) { state.qIndex += 1; resetQuestion(); goStep(2); } }
   function prevQuestion() { if (state.qIndex > 0) { state.qIndex -= 1; resetQuestion(); goStep(2); } }
 
@@ -330,13 +319,14 @@
       <details class="tr">
         <summary><span class="chip ${e.error ? "err" : (e.mode || "").toLowerCase()}">${e.error ? "LỖI" : e.mode}</span>
           <span>${esc(e.request?.mode)} · ${esc(e.request?.question?.id)} · ${esc(e.request?.persona)} · chọn ${esc(e.request?.learner_answer ?? "—")}</span>
-          ${e.user_feedback ? `<span class="chip">${e.user_feedback.rating === "up" ? "👍" : "👎"}</span>` : ""}
+          ${e.user_feedback ? `<span class="chip">${e.user_feedback.rating === "up" ? "👍" : "👎"}</span>` : ""}${e.events && e.events.length ? `<span class="chip">đã mở đầy đủ</span>` : ""}
           <span class="small">${e.latency_ms != null ? e.latency_ms + " ms" : ""} · ${new Date(e.ts).toLocaleTimeString("vi-VN")}</span></summary>
         ${e.error ? `<pre>${esc(e.error)}</pre>` : ""}
         <div class="small" style="margin-top:8px;"><b>Prompt</b></div><pre>${esc(typeof e.prompt === "string" ? e.prompt : JSON.stringify(e.prompt, null, 2))}</pre>
         <div class="small"><b>Phản hồi thô</b></div><pre>${esc(e.raw_response ?? "")}</pre>
         <div class="small"><b>Đã parse</b></div><pre>${esc(JSON.stringify(e.parsed, null, 2))}</pre>
         ${e.user_feedback ? `<div class="small"><b>Phản hồi học viên</b></div><pre>${esc(JSON.stringify(e.user_feedback, null, 2))}</pre>` : ""}
+        ${e.events && e.events.length ? `<div class="small"><b>Sự kiện</b> (mở giải thích đầy đủ, số giây dừng ở bậc 1)</div><pre>${esc(JSON.stringify(e.events, null, 2))}</pre>` : ""}
         <div class="grade" data-id="${e.id}">
           <span class="small strong">Chấm nhanh (người chấm):</span>
           ${[["persona_fit", "Đúng persona"], ["diagnosis", "Chẩn đoán đúng lỗi"], ["grounded", "Trích dẫn đúng / fallback đúng"], ["safe", "An toàn / không lộ đáp án ở hint"]].map(([k, l]) => `<label><input type="checkbox" data-k="${k}" ${e.eval?.[k] ? "checked" : ""}>${l}</label>`).join("")}
@@ -357,12 +347,12 @@
   function syncRadio() { document.querySelectorAll(".radio-row").forEach(r => r.classList.toggle("on", r.querySelector("input").checked)); }
 
   /* ---------- master render ---------- */
-  function render() { renderChrome(); renderPersona(); renderQuiz(); renderAI(); renderRetry(); renderTrace(); }
+  function render() { renderChrome(); renderPersona(); renderQuiz(); renderAI(); renderTrace(); }
 
   /* ---------- wire ---------- */
   $("btn-check").addEventListener("click", () => { if (state.checked && state.ai && !state.ai.needs_clarification) nextQuestion(); else runDiagnose(); });
   $("btn-prev").addEventListener("click", prevQuestion);
-  $("hint-toggle").addEventListener("click", () => { state.hintOpen = !state.hintOpen; if (state.hintOpen && !state.checked) state.hintViewed = true; render(); });
+  $("hint-toggle").addEventListener("click", () => { state.hintOpen = !state.hintOpen; if (state.hintOpen && !state.checked && !state.hintViewed) { state.hintViewed = true; window.AI.logEvent({ event: "open_pre_submit_hint", question_id: q().id, persona: state.persona, hint_available: Boolean(hintFor().text) }); } render(); });
   $("btn-back-persona").addEventListener("click", () => goStep(1));
   $("btn-followup").addEventListener("click", runFollowup);
   $("followup-text").addEventListener("keydown", (e) => { if (e.key === "Enter") runFollowup(); });

@@ -44,7 +44,7 @@ window.AI = (function () {
         clarifying_question: "Trước khi giải thích, cho mình biết công việc hằng ngày của bạn gần với nhóm nào nhất?",
         clarifying_options: Object.values(window.PERSONAS).filter(p => p.clarifier_option).map(p => ({ persona: p.key, label: p.clarifier_option })),
         misconception: null, hint: null, explanation: null, citation: null,
-        no_source_note: null, retry_question: null, followup_answer: null,
+        no_source_note: null, followup_answer: null,
         safety: { refused: false, reason: null }
       };
     }
@@ -83,12 +83,7 @@ window.AI = (function () {
         ? "[MOCK] Bạn chọn " + req.learner_answer + " — có vẻ bạn đang nhầm ý “" + q.options[req.learner_answer] + "” với ý đúng của câu hỏi. (Bản thật: AI nêu đúng giả định sai của bạn.)"
         : null,
       hint: wrong ? HINTS[persona] : null,
-      explanation: q.reference ? q.reference[persona] : "(chưa có lời giải mẫu)",
-      retry_question: wrong ? {
-        stem: "[MOCK] Câu hỏi làm lại cùng khái niệm “" + q.topic + "” nhưng đổi bối cảnh (bản thật do AI sinh theo persona).",
-        options: { A: "Phương án A", B: "Phương án B", C: "Phương án C", D: "Phương án D" },
-        correct: "B"
-      } : null
+      explanation: q.reference ? q.reference[persona] : "(chưa có lời giải mẫu)"
     });
   }
 
@@ -101,7 +96,7 @@ window.AI = (function () {
       misconception: null, hint: null, explanation: null,
       citation: anchor ? { code: anchor.code, quote: anchor.quote, confidence: q.anchor_confidence } : null,
       no_source_note: anchor ? null : "Transcript các buổi trong data pack chưa có đoạn nói trực tiếp về khái niệm này, nên phần giải thích dựa trên lời giải mẫu của nhóm, chưa có trích dẫn.",
-      retry_question: null, followup_answer: null, probe_result: null,
+      followup_answer: null, probe_result: null,
       safety: { refused: false, reason: null }
     }, patch);
   }
@@ -162,5 +157,13 @@ window.AI = (function () {
     } catch (_) { return { ok: false, stored: "trace_only" }; }
   }
 
-  return { explain, sendFeedback, settings: () => Object.assign({}, settings), saveSettings, isLive: () => settings.provider === "live" };
+  /** Sự kiện hành vi (mở gợi ý, mở giải thích đầy đủ) — ghi trace + gửi server khi LIVE. */
+  function logEvent(ev) {
+    const payload = Object.assign({ ui_mode: settings.provider === "live" ? "LIVE" : "MOCK", at: new Date().toISOString() }, ev);
+    window.Trace.event(payload);
+    if (settings.provider !== "live") return;
+    fetch(settings.endpoint.replace(/\/$/, "") + "/api/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).catch(() => {});
+  }
+
+  return { explain, sendFeedback, logEvent, settings: () => Object.assign({}, settings), saveSettings, isLive: () => settings.provider === "live" };
 })();

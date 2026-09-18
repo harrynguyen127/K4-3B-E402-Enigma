@@ -8,7 +8,7 @@ UI, logging, trace, eval đã sẵn — không cần sửa phần frontend.
 
 > Cho **cùng một câu hỏi + cùng đáp án đúng**, với đáp án học viên vừa chọn và hồ sơ (persona) của họ,
 > AI quyết định: (1) học viên đang nhầm giả định nào, (2) gợi ý tối thiểu để tự sửa, (3) lời giải thích
-> **theo đúng persona**, (4) trích dẫn đoạn transcript thật hoặc nói rõ "chưa có nguồn", (5) một câu làm lại.
+> **theo đúng persona**, (4) trích dẫn đoạn transcript thật hoặc nói rõ "chưa có nguồn".
 
 Ràng buộc cứng (đây là các case trong `eval/golden_set.json`):
 
@@ -67,14 +67,13 @@ Ràng buộc cứng (đây là các case trong `eval/golden_set.json`):
   "explanation": "…",                   // theo persona; nêu đáp án đúng và vì sao
   "citation": { "code": "T04-049", "quote": "…", "confidence": "strong" } | null,
   "no_source_note": null | "…",         // bắt buộc khi citation = null
-  "retry_question": { "stem": "…", "options": {"A":"…","B":"…","C":"…","D":"…"}, "correct": "B" } | null,
   "followup_answer": null | "…",        // mode followup / probe
   "probe_result": null | "understood" | "needs_more",
   "safety": { "refused": false, "reason": null | "out_of_scope" | "prompt_injection" | "asks_answer_directly" }
 }
 ```
 
-Hành vi UI liên quan (theo VLearn thật): **"Kiểm tra" = nộp câu**, đáp án bị khoá, không có chọn lại. Con đường sửa sai duy nhất là `retry_question`. Vì vậy `retry_question` là **bắt buộc** khi `verdict = "incorrect"` (mode diagnose). Request có thêm `hint_viewed: boolean` (học viên đã mở gợi ý sinh sẵn trước khi nộp) — có thể dùng để điều chỉnh mức gợi ý bậc 1.
+Hành vi UI liên quan (theo VLearn thật): **"Kiểm tra" = nộp câu**, đáp án bị khoá, không có chọn lại và **không có câu làm lại**. Sau bậc 1, học viên bấm "Xem giải thích đầy đủ" (được log) rồi chuyển câu tiếp theo. Request có `hint_viewed: boolean` (đã mở gợi ý sinh sẵn trước khi nộp).
 
 ## 3b. Mode `"hint"` — offline, chạy một lần (không qua UI)
 
@@ -85,7 +84,11 @@ Hành vi UI liên quan (theo VLearn thật): **"Kiểm tra" = nộp câu**, đá
 - Script tự gắn `flagged: true` nếu hint chứa nội dung phương án đúng → nhóm đọc tay trước khi demo.
 - Log: `server/logs/hints-YYYY-MM-DD.jsonl`. Script dừng và **không ghi đè** file khi `callModel()` chưa cấu hình.
 
-## 3c. `POST /api/feedback` — phản hồi của học viên (không cần model)
+## 3c. `POST /api/event` — sự kiện hành vi (không cần model)
+
+`{ "event": "open_pre_submit_hint" | "open_full_explanation", "trace_id", "question_id", "persona", "seconds_on_level1", "hint_viewed" }` → append `server/logs/events.jsonl`. Dùng để trả lời: bản gợi ý/chẩn đoán ngắn (bậc 1) có đủ dễ hiểu không — tỉ lệ bấm xem đầy đủ và thời gian dừng ở bậc 1.
+
+## 3d. `POST /api/feedback` — phản hồi của học viên (không cần model)
 
 ```jsonc
 { "trace_id": "call_…", "question_id": "Q07", "persona": "nonit", "mode": "diagnose",
