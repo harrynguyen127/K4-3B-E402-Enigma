@@ -62,6 +62,10 @@ Loại: [x] Tính năng mới
   - Không thay thế toàn bộ tutor hiện có trên VLearn.
   - Không xử lý các câu hỏi hành chính, lịch học, nộp bài, điểm số.
 - Mức prototype nhắm tới: [ ] Sketch [ ] Mock [x] Working
+  - **Cập nhật CP3 (18/09):** bản demo chính chuyển sang `codebase/index.html` (+ `js/`, `css/`, `server/`). Luồng 4 bước: hồ sơ → làm bài trước → AI chẩn đoán lỗi theo bậc (gợi ý → giải thích → trích dẫn transcript) → làm lại & giải thích lại. Điểm gọi AI duy nhất: `AI.explain()` → `POST /api/explain` (hợp đồng: `codebase/AI_CONTRACT.md`). Panel Trace ghi prompt + phản hồi thô + độ trễ từng lời gọi; server ghi `codebase/server/logs/*.jsonl`.
+  - **Thật (đã chạy):** toàn bộ luồng UI và ladder, trace/log, kiểm tra `citation ∉ anchors` phía server, chỉ số học trong phiên (sai lần 1 / sửa đúng sau gợi ý / đúng câu làm lại / thời gian đến lời giải).
+  - **Đang chờ (AI Engineer):** `callModel()` trong `codebase/server/server.js` — lời gọi model thật. Trước khi xong, UI hiển thị badge **MOCK** và dùng lời giải mẫu của nhóm; video CP3 phải quay ở chế độ LIVE.
+  - **Mock có chủ ý (không build trong hackathon):** suy persona từ CV; dashboard giảng viên; lưu lịch sử lỗi giữa các phiên.
   - Bản mẫu tương tác (trang tĩnh HTML/CSS/JS, chạy được trực tiếp trên trình duyệt, không cần server): `codebase/prototype.html`.
   - Thật (chạy trong prototype, logic có thật dù data cố định): chọn hồ sơ (persona) ở thanh trên cùng đổi ngay toàn bộ gợi ý + giải thích; chọn đáp án A-D có phản hồi đúng/sai theo state; nút "Xem gợi ý" và "Kiểm tra" là hai luồng độc lập thật sự (không phải ảnh tĩnh).
   - Giả lập (Mock — sẽ thay bằng AI thật ở CP3): nội dung câu hỏi/giải thích/thuật ngữ cho 3 persona đang là dữ liệu viết sẵn (fixed), chưa qua profile classifier hay contextualized question generation thật; dashboard giảng viên và profile mapping cũng chỉ demo tĩnh.
@@ -124,12 +128,10 @@ Loại: [x] Tính năng mới
   - Grounded feedback rate: % phản hồi có căn cứ từ bài học và ví dụ tương ứng.
   - Safe fallback rate: % trường hợp thiếu thông tin nhưng không bịa hoặc ép profile sai.
 
-- Golden set (file sẽ tạo trong eval/):
-  - Tối thiểu 24 case:
-    - 8 case cho profile Data/AI.
-    - 8 case cho profile IT/Dev.
-    - 8 case cho profile Non-IT.
-  - Mỗi case gồm: profile, question, learner_answer, expected_misconception, expected_feedback_style, expected_source_anchor.
+- Golden set (`eval/golden_set.json` — bản nháp 0.1, 24 case, cần review; định nghĩa đạt và cơ cấu trong `eval/README.md`, lưới phủ trong `eval/user-input-grid.md`):
+  - Cơ cấu theo guide §2.6: ① 3 case · ② 3 case · ③ 4 case · ④ 2 case · thường gặp 9 · hiếm 3; **15/24 case phát triển từ chatlog thật** (ghi `turn_id`).
+  - Mỗi case gồm: `request` (mode, persona, question_id, learner_answer, followup_text/learner_explanation, attempt, history) và `expected` (verdict, must, must_not) theo `codebase/AI_CONTRACT.md`.
+  - Ngân hàng 20 câu + lời giải mẫu 3 persona + mã đoạn transcript được phép trích dẫn: `codebase/js/data.questions.js` (Q16, Q19 không có transcript tương ứng — dùng làm case lớp ①).
 
 - Quality bar (chốt tại CP4):
   - Đạt khi:
@@ -139,6 +141,7 @@ Loại: [x] Tính năng mới
     - 100% case ngoài phạm vi không bịa thông tin.
 
 - Kết quả các lượt chạy (cập nhật trước CP6):
+  - Lượt 1: `eval/run-01-results.md` (chưa chạy — chờ lời gọi model thật). Log thô: `codebase/server/logs/`.
 
 | Lần chạy | Số case | Profile alignment | Recovery rate | Grounded/fallback đúng | Ghi chú |
 |---|---:|---:|---:|---:|---|
@@ -170,3 +173,6 @@ Loại: [x] Tính năng mới
 |---|---|---|
 | 17/09/2026 | Chuyển trọng tâm từ adaptive quiz feedback chung sang profile-aware personalized learning | Đề bài của nhóm xác định rõ: mỗi học viên có background nghề nghiệp khác nhau và nên nhận câu hỏi, ví dụ, phản hồi khác nhau dù cùng kiến thức |
 | 17/09/2026 | Thêm profile map Data/AI, IT/Dev, Non-IT vào golden set và prompt logic | Duy trì tính phù hợp với khóa học K4 và các nhóm học viên khác nhau |
+| 18/09/2026 | Dựng khung CP3: `codebase/index.html` (luồng 4 bước, ladder gợi ý→giải thích→làm lại, trace), `server/` proxy + log, `AI_CONTRACT.md`; giữ `prototype.html` làm bản CP2 | vlearn_cp3.md yêu cầu ≥1 lời gọi AI thật tại quyết định trung tâm + log prompt/raw; tách UI khỏi AI để AI Engineer ghép độc lập |
+| 18/09/2026 | Golden set nháp 24 case trong `eval/` theo 4 lớp chỗ khó + User Input Grid; 15 case từ chatlog K4 (T10472, T10471, T10451, T10509, T10729, T11237, T11043, T11736, T12701, T10318, T10814, T10330, T11020, T10687, T10441) | Thay cơ cấu cũ "8 case/persona" (không phủ 4 lớp) bằng cơ cấu guide §2.6 |
+| 18/09/2026 | Gắn mã đoạn transcript thật cho từng câu (`anchors`, `anchor_confidence`); phát hiện transcript **không có** đoạn về vector DB/embedding/chunking | Tránh AI bịa trích dẫn (lớp ①): chỉ được trích trong danh sách anchors, không có thì nói rõ |

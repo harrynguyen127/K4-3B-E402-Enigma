@@ -1,0 +1,7 @@
+# Bí mật — không bao giờ commit
+codebase/server/.env
+
+# Log server (codebase/server/logs/*.jsonl) CỐ Ý được commit: CP3 yêu cầu giữ trace trong repo.
+node_modules/
+.DS_Store
+Thumbs.db
