@@ -161,7 +161,7 @@ Loại: [x] Tính năng mới
   - Nguyễn Hoàng Cường - Học viên profile Data/AI
   - Văn Thành Huy - Học viên profile IT/Dev
   - Nguyễn Tiến Phát - Học viên profile Non-IT
-  - Kế hoạch và kết quả vòng validation: đã thực hiện đo kiểm thực tế trên 4 bạn ngoài nhóm (1 Data/AI, 2 Non-IT, 1 IT/Dev) theo chuẩn 4.2. Bảng log chi tiết và 4 dòng tổng hợp xem tại [`validation/user-validation.md`](validation/user-validation.md). Kết quả: 100% đánh giá giải thích dễ hiểu; phát hiện mâu thuẫn nhận thức đắt giá giữa Dev (thấy đề quá dễ) và Non-tech (thấy 10 câu đều quá khó), đo được độ trễ thật ~10s/câu.
+  - Kế hoạch và kết quả vòng validation: đã thực hiện đo kiểm thực tế trên 4 bạn (gồm willing user Nguyễn Hoàng Cường + 3 bạn ngoài nhóm Minh Tâm, Khánh Linh, Viết Đức) theo chuẩn 4.2. Bảng log chi tiết và 4 dòng tổng hợp xem tại [`validation/user-validation.md`](validation/user-validation.md). Kết quả: 100% đánh giá giải thích dễ hiểu; phát hiện mâu thuẫn nhận thức đắt giá giữa Dev (thấy đề quá dễ) và Non-tech (thấy 10 câu đều quá khó), đo được độ trễ thật ~10s/câu.
 
 - Multi-prototype (nếu làm):
   - PA1: Rule-based profile-aware hint ladder.
