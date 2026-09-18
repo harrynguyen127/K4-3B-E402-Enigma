@@ -89,7 +89,7 @@
       <section class="card pad stack" id="sec-persona">
         <div>
           <div class="label">Bước 1 · Hồ sơ học viên</div>
-          <h2 style="font-size:20px;margin-top:4px;">Bạn đến từ nền tảng nào?</h2>
+          <h2 style="font-size:24px;margin-top:4px;">Bạn đến từ nền tảng nào?</h2>
           <div class="small">Hồ sơ xác định qua các câu tự đánh giá lúc onboarding. Nếu chưa có thông tin chắc chắn, bạn tự chọn nhóm của mình tại đây và đổi lại bất cứ lúc nào trong cài đặt. Chọn "Chưa rõ" nếu muốn hệ thống hỏi lại trước khi giải thích.</div>
         </div>
         <div class="persona-grid" id="persona-grid"></div>
@@ -161,8 +161,8 @@
       </div>
       <div class="sb-profile" id="sb-profile" style="background:var(--unknown)">
         <div class="label" style="color:rgba(255,255,255,.8)">Đang xem theo góc nhìn</div>
-        <div style="font-size:18px;font-weight:700;margin-top:2px;" id="sb-profile-name">Chưa chọn</div>
-        <div style="font-size:12px;opacity:.85;margin-top:2px;" id="sb-profile-desc">Chọn hồ sơ ở bước 1.</div>
+        <div style="font-size:22px;font-weight:700;margin-top:2px;" id="sb-profile-name">Chưa chọn</div>
+        <div style="font-size:14px;opacity:.85;margin-top:2px;" id="sb-profile-desc">Chọn hồ sơ ở bước 1.</div>
       </div>
       <div class="sb-card" id="sb-sources">
         <div class="label">Nguồn trích dẫn</div>
@@ -180,7 +180,7 @@
       <div class="livegen-head">
         <div>
           <div class="label">Bộ nhớ AI · sinh một lần, dùng lại <span class="tour-tag d2">D2</span></div>
-          <h2 style="font-size:18px;margin-top:4px;">Tạo gợi ý và lời giải theo 3 hồ sơ cho cả bộ câu hỏi demo</h2>
+          <h2 style="font-size:22px;margin-top:4px;">Tạo gợi ý và lời giải theo 3 hồ sơ cho cả bộ câu hỏi demo</h2>
           <div class="small">Lần đầu vào Live demo mà bộ nhớ còn trống (hoặc khi bấm nút bên phải), hệ thống gọi model thật cho từng câu × hồ sơ × đáp án, rồi lưu vào file cache trên server (model chọn ở khung bên dưới) và bản sao trong trình duyệt. Từ đó, chọn đáp án, Kiểm tra và xem gợi ý chỉ đọc bộ nhớ, <b>không gọi API AI nào</b>. Mỗi lời gọi ghi một dòng vào bảng log bên dưới: model, system prompt, prompt, phản hồi, token, chi phí.</div>
           <div class="small" id="memory-status" style="margin-top:6px;"></div>
         </div>
@@ -189,12 +189,20 @@
           <button class="btn" id="btn-memory-regen" title="Gọi lại model cho toàn bộ mục, bỏ qua cache (tốn phí)">Tạo lại toàn bộ…</button>
         </div>
       </div>
-      <div class="model-picker" id="sec-qcount">
-        <div class="label">Số câu hỏi tạo lời giải thích</div>
-        <div class="mp-row">
-          <input type="number" id="qcount" min="1" max="20" step="1" value="3" aria-label="Tổng số câu hỏi tạo lời giải thích">
-          <span class="small">câu (mặc định 3, tối đa 20). Đổi số câu cũng đổi số câu trong Live demo; chỉ các mục còn thiếu mới bị gọi model.</span>
+      <div class="qpick" id="sec-qpick">
+        <div class="qpick-head">
+          <div>
+            <div class="label">Chọn câu hỏi để tạo lời giải</div>
+            <div class="qpick-count" id="qpick-count"></div>
+            <div class="small">Tick các câu muốn demo/test. Live demo chỉ dùng các câu đã chọn. Bấm <b>Tạo</b> ở từng câu để chỉ gọi model cho câu đó, hoặc dùng nút "Tạo câu gợi ý" phía trên để sinh cho tất cả câu đã chọn (chỉ mục còn thiếu).</div>
+          </div>
+          <div class="qpick-tools">
+            <div class="qpick-n"><input type="number" id="qcount" min="1" max="20" step="1" value="3" aria-label="Số câu đầu"><button class="btn" id="btn-qpick-n">Chọn N câu đầu</button></div>
+            <button class="btn" id="btn-qpick-all">Chọn tất cả</button>
+            <button class="btn" id="btn-qpick-none">Bỏ chọn (giữ câu 1)</button>
+          </div>
         </div>
+        <div class="qpick-list" id="qpick-list"></div>
       </div>
       <div class="model-picker" id="sec-model">
         <div class="label">Provider và model AI</div>
@@ -259,7 +267,7 @@
 <!-- ===== SETTINGS MODAL ===== -->
 <div class="modal-bg" id="modal">
   <div class="modal">
-    <h3 style="font-size:18px;">Cài đặt lời gọi AI</h3>
+    <h3 style="font-size:22px;">Cài đặt lời gọi AI</h3>
     <label class="radio-row on" id="rr-mock"><input type="radio" name="prov" value="mock" checked><div><b>DEMO (mặc định)</b> — nút "Kiểm tra" không gọi API AI; chẩn đoán, gợi ý và giải thích đọc từ bộ nhớ AI (sinh một lần bằng model thật, lưu ở server và trình duyệt). Mục chưa có trong bộ nhớ dùng lời giải mẫu của nhóm (<code>data.questions.js</code>). Không tốn phí lúc trả lời.</div></label>
     <label class="radio-row" id="rr-live"><input type="radio" name="prov" value="live"><div><b>LIVE</b> — hint và explanation được sinh trực tiếp bởi model cấu hình trong <code>server/.env</code> (mặc định Claude qua Anthropic API; có thể đổi sang Ollama local). Chỉ dùng khi cần test pipeline thật.</div></label>
     <div>

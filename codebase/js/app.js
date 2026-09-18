@@ -7,12 +7,12 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   // Demo chỉ hiện 3 câu đầu (Q01–Q03); ngân hàng đầy đủ vẫn nằm trong data.questions.js.
-  // Số câu hỏi dùng cho demo + bộ nhớ AI: chọn ở tab Tech (mặc định 3, tối đa 20), nhớ trong localStorage.
-  const QCOUNT_KEY = "enigma_question_count_v1", QCOUNT_DEFAULT = 3, QCOUNT_MAX = Math.min(20, window.QUESTION_BANK.length);
-  const clampCount = (v) => { const n = Math.floor(Number(v)); return Number.isFinite(n) ? Math.max(1, Math.min(QCOUNT_MAX, n)) : QCOUNT_DEFAULT; };
-  let questionCount = QCOUNT_DEFAULT;
-  try { questionCount = clampCount(localStorage.getItem(QCOUNT_KEY) ?? QCOUNT_DEFAULT); } catch (_) {}
-  let BANK = window.QUESTION_BANK.slice(0, questionCount);
+  // Câu hỏi dùng cho demo + bộ nhớ AI: chọn ở tab Tech (mặc định 3 câu đầu, tối đa 20), nhớ trong localStorage.
+  const SEL_KEY = "enigma_selected_questions_v1", QCOUNT_DEFAULT = 3, QCOUNT_MAX = Math.min(20, window.QUESTION_BANK.length);
+  const ALL_Q = window.QUESTION_BANK.slice(0, QCOUNT_MAX), ONE_Q = ALL_Q.map(x => [x]);
+  let selected = new Set(ALL_Q.slice(0, QCOUNT_DEFAULT).map(x => x.id));
+  try { const s = JSON.parse(localStorage.getItem(SEL_KEY) || "null"); const ok = Array.isArray(s) ? s.filter(id => ALL_Q.some(x => x.id === id)) : []; if (ok.length) selected = new Set(ok); } catch (_) {}
+  let BANK = ALL_Q.filter(x => selected.has(x.id));
   const P = window.PERSONAS;
   const HINTS = window.HINT_BANK || {}, HINT_META = window.HINT_BANK_META || {};
   // Bộ nhớ AI (js/ai-memory.js): sinh một lần bằng model thật, sau đó mọi lượt trả lời chỉ đọc lại.
@@ -624,10 +624,11 @@
     if (M.isBusy()) return;
     const ep = window.AI.settings().endpoint.replace(/\/$/, "");
     memNote = null;
-    let todo = o.force ? M.plan(BANK).slice() : M.missing(BANK);
+    const bank = o.bank || BANK;
+    let todo = o.force ? M.plan(bank).slice() : M.missing(bank);
     if (!todo.length) { render(); return; }
     if (!o.force) {
-      try { await M.sync(ep, BANK); todo = M.missing(BANK); }
+      try { await M.sync(ep, bank); todo = M.missing(bank); }
       catch (e) { memNote = `Không đọc được cache server (${e.message || e}).`; }
       if (!todo.length) { memNote = null; render(); return; }
     }
@@ -642,7 +643,7 @@
 
     memProgress = { done: 0, total: todo.length, fail: 0 };
     render();
-    const res = await M.generate(todo, (item) => memWorker(item, Boolean(o.force)), { onProgress: (p) => { memProgress = p; renderMemoryStatus(); renderChrome(); } });
+    const res = await M.generate(todo, (item) => memWorker(item, Boolean(o.force)), { onProgress: (p) => { memProgress = p; renderMemoryStatus(); renderChrome(); renderPicker(); } });
     memProgress = null;
     if (res.aborted) memNote = `Dừng vì lỗi: ${res.lastError}. Đã sinh ${res.ok}/${todo.length} mục.`;
     else if (res.fail) memNote = `${res.fail}/${todo.length} lời gọi lỗi (${res.lastError}). Bấm "Tạo câu gợi ý cho bộ câu hỏi" để thử lại các mục còn thiếu.`;
@@ -813,7 +814,7 @@
     show(el, Boolean(g)); if (!g) return;
     el.innerHTML = `<div class="g-icon">${g.n}</div><div class="g-body"><div class="g-do">${g.do}</div><div class="g-see">${g.see}</div></div><div class="g-tag">${g.d2 ? D2 : BASE}</div>`;
   }
-  function render() { renderChrome(); renderPersona(); renderQuiz(); renderAI(); renderTrace(); renderGuide(); renderLiveGen(); }
+  function render() { renderChrome(); renderPersona(); renderQuiz(); renderAI(); renderTrace(); renderGuide(); renderLiveGen(); renderPicker(); }
 
   /* ---------- wire ---------- */
   $("btn-check").addEventListener("click", () => { if (state.checked && state.ai && !state.ai.needs_clarification) nextQuestion(); else runDiagnose(); });
@@ -831,23 +832,60 @@
   $("btn-memory-gen").addEventListener("click", () => ensureMemory({ generate: true, manual: true }));
   $("btn-memory-regen").addEventListener("click", () => {
     const n = M.plan(BANK).length;
-    if (confirm(`Tạo lại toàn bộ bộ nhớ AI?\n\n${n} lời gọi model, bỏ qua cache, ước tính ≈ $${(n * EST_USD_PER_CALL).toFixed(2)} và có thể mất vài phút.`)) ensureMemory({ generate: true, manual: true, force: true });
+    if (confirm(`Tạo lại bộ nhớ AI cho ${BANK.length} câu đã chọn?\n\n${n} lời gọi model, bỏ qua cache, ước tính ≈ $${(n * EST_USD_PER_CALL).toFixed(2)} và có thể mất vài phút.`)) ensureMemory({ generate: true, manual: true, force: true });
   });
-  const qc = $("qcount");
-  qc.max = QCOUNT_MAX; qc.value = questionCount;
-  qc.addEventListener("change", async () => {
-    if (M.isBusy()) { qc.value = questionCount; return; }
-    const n = clampCount(qc.value);
-    qc.value = n;
-    if (n === questionCount) return;
-    questionCount = n;
-    try { localStorage.setItem(QCOUNT_KEY, String(n)); } catch (_) {}
-    BANK = window.QUESTION_BANK.slice(0, n);
-    if (state.qIndex >= BANK.length) { state.qIndex = BANK.length - 1; resetQuestion(); }
-    try { await M.sync(apiBase(), BANK); } catch (_) {}
+  /* ---------- chọn câu hỏi để sinh + demo (tab Tech) ---------- */
+  const qtypeLabel = { single_choice: "Chọn 1", multi_select: "Chọn nhiều", ordering: "Sắp xếp" };
+  function applySelection(ids) {
+    if (M.isBusy() || !ids.size) return;
+    const curId = BANK[state.qIndex]?.id;
+    selected = ids;
+    try { localStorage.setItem(SEL_KEY, JSON.stringify([...selected])); } catch (_) {}
+    BANK = ALL_Q.filter(x => selected.has(x.id));
+    const i = BANK.findIndex(x => x.id === curId);
+    if (i < 0) { state.qIndex = 0; resetQuestion(); } else state.qIndex = i;
+    void M.sync(apiBase(), BANK).catch(() => {}).then(render);
     render();
+  }
+  function renderPicker() {
+    const box = $("qpick-list"); if (!box) return;
+    const busy = M.isBusy();
+    $("qpick-count").textContent = `${selected.size} / ${ALL_Q.length} câu được chọn`;
+    $("qcount").max = ALL_Q.length; $("qcount").disabled = busy;
+    $("btn-qpick-n").disabled = busy; $("btn-qpick-all").disabled = busy; $("btn-qpick-none").disabled = busy;
+    box.innerHTML = ALL_Q.map((q, i) => {
+      const st = M.status(ONE_Q[i]), on = selected.has(q.id);
+      const stt = st.have === 0 ? ["none", "Chưa có"] : st.have === st.total ? ["full", "Đủ " + st.have + "/" + st.total] : ["part", st.have + "/" + st.total];
+      return `<div class="qp-row ${on ? "on" : ""}" data-id="${esc(q.id)}">
+        <label class="qp-main"><input type="checkbox" class="qp-cb" data-id="${esc(q.id)}" ${on ? "checked" : ""} ${busy ? "disabled" : ""}>
+          <span class="qp-num">${i + 1}</span>
+          <span class="qp-body"><span class="qp-meta"><b>${esc(q.id)}</b><span class="qp-chip">${esc(q.topic || "—")}</span><span class="qp-chip">${esc(qtypeLabel[q.question_type || "single_choice"] || q.question_type)}</span></span>
+          <span class="qp-stem">${esc(q.stem)}</span></span></label>
+        <div class="qp-side"><span class="qp-st ${stt[0]}">${stt[1]}</span>
+          <button class="btn sm qp-gen" data-id="${esc(q.id)}" ${busy ? "disabled" : ""}>${st.have === st.total && st.total ? "Tạo lại" : "Tạo"}</button></div>
+      </div>`;
+    }).join("");
+  }
+  $("qpick-list").addEventListener("change", (e) => {
+    const cb = e.target.closest(".qp-cb"); if (!cb) return;
+    const next = new Set(selected); cb.checked ? next.add(cb.dataset.id) : next.delete(cb.dataset.id);
+    if (!next.size) { cb.checked = true; return; }
+    applySelection(next);
   });
-  M.onChange(() => { renderChrome(); renderMemoryStatus(); renderQuiz(); if (providersInfo) updatePickerState(); });
+  $("qpick-list").addEventListener("click", (e) => {
+    const b = e.target.closest(".qp-gen"); if (!b || b.disabled) return;
+    const q = ALL_Q.find(x => x.id === b.dataset.id); if (!q) return;
+    const full = M.status([q]).have === M.plan([q]).length;
+    if (full && !confirm(`Tạo lại toàn bộ lời giải của câu ${q.id}?
+
+${M.plan([q]).length} lời gọi model, bỏ qua cache.`)) return;
+    void ensureMemory({ generate: true, manual: true, force: full, bank: [q] });
+  });
+  $("btn-qpick-n").addEventListener("click", () => { const n = Math.max(1, Math.min(ALL_Q.length, Math.floor(Number($("qcount").value)) || QCOUNT_DEFAULT)); $("qcount").value = n; applySelection(new Set(ALL_Q.slice(0, n).map(x => x.id))); });
+  $("btn-qpick-all").addEventListener("click", () => applySelection(new Set(ALL_Q.map(x => x.id))));
+  $("btn-qpick-none").addEventListener("click", () => applySelection(new Set([ALL_Q[0].id])));
+  $("qcount").value = Math.min(selected.size, ALL_Q.length);
+  M.onChange(() => { renderChrome(); renderMemoryStatus(); renderPicker(); renderQuiz(); if (providersInfo) updatePickerState(); });
   $("mp-provider").addEventListener("change", () => fillModels($("mp-provider").value, null));
   $("mp-model").addEventListener("change", () => { $("mp-custom").hidden = $("mp-model").value !== "__custom"; if (!$("mp-custom").hidden) $("mp-custom").focus(); });
   $("btn-mp-apply").addEventListener("click", async () => {
