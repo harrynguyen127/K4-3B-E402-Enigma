@@ -7,9 +7,21 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   // Demo chỉ hiện 3 câu đầu (Q01–Q03); ngân hàng đầy đủ vẫn nằm trong data.questions.js.
-  const DEMO_QUESTION_LIMIT = 3;
-  const BANK = window.QUESTION_BANK.slice(0, DEMO_QUESTION_LIMIT), P = window.PERSONAS;
+  // Số câu hỏi dùng cho demo + bộ nhớ AI: chọn ở tab Tech (mặc định 3, tối đa 20), nhớ trong localStorage.
+  const QCOUNT_KEY = "enigma_question_count_v1", QCOUNT_DEFAULT = 3, QCOUNT_MAX = Math.min(20, window.QUESTION_BANK.length);
+  const clampCount = (v) => { const n = Math.floor(Number(v)); return Number.isFinite(n) ? Math.max(1, Math.min(QCOUNT_MAX, n)) : QCOUNT_DEFAULT; };
+  let questionCount = QCOUNT_DEFAULT;
+  try { questionCount = clampCount(localStorage.getItem(QCOUNT_KEY) ?? QCOUNT_DEFAULT); } catch (_) {}
+  let BANK = window.QUESTION_BANK.slice(0, questionCount);
+  const P = window.PERSONAS;
   const HINTS = window.HINT_BANK || {}, HINT_META = window.HINT_BANK_META || {};
+  // Bộ nhớ AI (js/ai-memory.js): sinh một lần bằng model thật, sau đó mọi lượt trả lời chỉ đọc lại.
+  const M = window.AIMemory;
+  // Ô "Hỏi thêm" gõ tự do không có bộ nhớ sẵn nên phải gọi AI → tắt để demo không có lời gọi nào khi trả lời.
+  // Mã và mock vẫn giữ nguyên; đổi thành true để bật lại.
+  const FOLLOWUP_ENABLED = false;
+  // Ước tính USD mỗi lời gọi (test 18/09/2026: 6 lời gọi ≈ $0.11), chỉ dùng cho hộp xác nhận "Tạo lại".
+  const EST_USD_PER_CALL = 0.02;
   // Mỗi câu/persona có một job riêng để prefetch không bị gọi trùng và không
   // ghi nhầm trạng thái khi người dùng chuyển câu trong lúc model còn chạy.
   const hintJobs = Object.create(null);
@@ -19,7 +31,7 @@
   function modelLabel() { return serverGen?.model || "model LIVE"; }
   async function loadServerInfo() {
     // Nút "Kiểm tra" dùng dữ liệu đã gen sẵn (mock), không cần server AI thật.
-    // Chỉ hỏi /api/health khi nhóm dev chủ động bật LIVE trong ⚙ (dùng cho "Sinh trực tiếp").
+    // Chỉ hỏi /api/health khi nhóm dev chủ động bật LIVE trong ⚙ (bộ nhớ AI tự hỏi /api/health khi cần sinh).
     if (!window.AI.isLive()) { serverGen = null; renderChrome(); return; }
     try {
       const ep = window.AI.settings().endpoint.replace(/\/$/, "");
@@ -44,8 +56,7 @@
     checked: false,         // đã nộp → khoá đáp án
     hintOpen: false,
     hintViewed: false,
-    liveHints: {},          // "Q01:nonit" -> hint sinh trực tiếp bởi model LIVE
-    liveExplains: {},       // "Q01:nonit" -> lời giải sinh bằng nút "Sinh trực tiếp" (chỉ để hiển thị trong log)
+    liveHints: {},          // "Q01:nonit" -> hint sinh trực tiếp bởi model LIVE (chế độ dev bật trong ⚙); demo thường đọc AIMemory
     hintBusy: false,
     hintError: null,
     ai: null,               // ExplainResponse của lần diagnose gần nhất
@@ -57,6 +68,7 @@
     stats: { checked: 0, wrong: 0, hint: 0, times: [], up: 0, down: 0 }
   };
   const q = () => BANK[state.qIndex];
+  let currentTab = "info";
 
   /* ---------- helpers ---------- */
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -79,6 +91,13 @@
   }
 
   /* ---------- render: stepper / sidebar / mode ---------- */
+  function memoryLabel(s) {
+    if (s.busy) return `DEMO · AI đang sinh bộ nhớ ${s.have}/${s.total}…`;
+    if (s.total && s.have === s.total) return `DEMO · bộ nhớ AI ${s.have}/${s.total}${s.model ? " · " + s.model : ""}`;
+    if (s.have) return `DEMO · bộ nhớ AI ${s.have}/${s.total} (phần thiếu dùng lời giải mẫu)`;
+    return "DEMO · chưa có bộ nhớ AI (dùng lời giải mẫu của nhóm)";
+  }
+
   function renderChrome() {
     document.querySelectorAll(".step").forEach(s => {
       const n = Number(s.dataset.step);
@@ -87,15 +106,16 @@
     });
     document.body.classList.add("presentation-mode");
     const isLive = window.AI.isLive();
-    $("mode-badge").className = isLive ? "mode-badge live" : "mode-badge mock";
+    const mem = M.status(BANK), memFull = mem.total > 0 && mem.have === mem.total;
+    $("mode-badge").className = isLive || (memFull && !mem.busy) ? "mode-badge live" : "mode-badge mock";
     $("mode-label").textContent = isLive
       ? (serverGen ? `LIVE · ${serverGen.provider || "AI"}${serverGen.model ? " · " + serverGen.model : ""}` : "LIVE · đang kiểm tra server…")
-      : "DEMO · dữ liệu AI đã sinh sẵn";
+      : memoryLabel(mem);
 
     // tiến độ lượt
     const done = Object.keys(state.submitted).length;
     const okCount = Object.values(state.submitted).filter(v => v === "correct").length;
-    $("sb-done").textContent = done; $("sb-progress").style.width = (done / BANK.length * 100) + "%";
+    $("sb-done").textContent = done; $("sb-total").textContent = `/ ${BANK.length}`; $("sb-progress").style.width = (done / BANK.length * 100) + "%";
     $("sb-score").textContent = done ? `${okCount} đúng · ${done - okCount} sai` : "Chưa nộp câu nào.";
 
     // kiến thức đang luyện
@@ -131,7 +151,7 @@
 
   /* ---------- step 2: quiz ---------- */
   function hintData(persona) {
-    // Gợi ý vừa sinh bằng nút "Sinh trực tiếp" luôn được ưu tiên, kể cả khi demo đang ở chế độ dữ liệu sinh sẵn.
+    // Chế độ LIVE (dev): gợi ý vừa sinh trực tiếp được ưu tiên. Demo thường: precomputedHint → bộ nhớ AI → HINT_BANK → mock.
     const live = state.liveHints[`${q().id}:${persona}`];
     if (live) return live;
     if (window.AI.isLive()) return null;
@@ -139,6 +159,7 @@
   }
 
   function hintFor() {
+    if (M.isBusy() && !window.AI.isLive()) return { text: null, why: "AI đang chuẩn bị bộ nhớ gợi ý, đợi trong giây lát." };
     if (state.persona === "mentor") {
       const found = ["nonit", "dev", "dataai"].map(k => ({ persona: k, data: hintData(k) }));
       const rows = found.map(x => x.data?.hint ? `${P[x.persona].name}: ${x.data.hint}` : null).filter(Boolean);
@@ -209,6 +230,7 @@
     const check = $("btn-check");
     if (state.busy) { check.textContent = "Đang gửi…"; check.disabled = true; }
     else if (state.checked && state.ai && !state.ai.needs_clarification) { check.textContent = state.qIndex < BANK.length - 1 ? "Câu tiếp theo →" : "Hoàn thành lượt"; check.disabled = state.qIndex >= BANK.length - 1; }
+    else if (M.isBusy()) { check.textContent = "AI đang chuẩn bị nội dung…"; check.disabled = true; }
     else { check.textContent = "Kiểm tra"; check.disabled = !state.answer; }
     if (!state.tStart) state.tStart = Date.now();
   }
@@ -248,13 +270,13 @@
   /* ---------- step 3: AI ---------- */
   function aiHeader(title, kind, ai, personaKey = state.persona) {
     const mode = ai?._mode || window.AI.mode();
-    const visibleMode = mode === "LIVE" ? "API" : mode;
+    const visibleMode = { LIVE: "API", MEMORY: "AI · bộ nhớ" }[mode] || mode;
     const lat = ai?._latency_ms != null ? ` · ${ai._latency_ms} ms` : "";
     return `<div class="head"><span class="tag" style="color:${pColor(personaKey)}"><span class="dot" style="background:${pColor(personaKey)}"></span>${title}</span><span class="meta">${visibleMode}${lat} · ${kind}</span></div>`;
   }
   function citeHtml(ai) {
     if (ai.citation) return `<div class="cite"><span class="code">[${esc(ai.citation.code)}]</span> “${esc(ai.citation.quote)}” <span class="small">· độ tin cậy nguồn: ${esc(ai.citation.confidence || "")}</span></div>`;
-    if (window.AI.isLive()) return `<div class="cite none"><b>Nguồn kiến thức:</b> Giải thích dựa trên kiến thức nền tảng của chủ đề.</div>`;
+    if (ai._mode === "MEMORY" || window.AI.isLive()) return `<div class="cite none"><b>Nguồn kiến thức:</b> Giải thích dựa trên kiến thức nền tảng của chủ đề.</div>`;
     return `<div class="cite none"><b>Chưa có trích dẫn.</b> ${esc(ai.no_source_note || "Tài liệu buổi học chưa có đoạn tương ứng.")}</div>`;
   }
   function generationMetaHtml(ai) {
@@ -329,7 +351,11 @@
     </div></div>`);
     sec.innerHTML = pieces.join("");
     wireFeedback(sec, (key) => ({ trace_id: state.ai?._trace_id, mode: "diagnose", block: key }));
-    $("lnk-compare") && ($("lnk-compare").onclick = (e) => { e.preventDefault(); $("compare-out").innerHTML = ["nonit", "dev", "dataai"].filter(k => k !== state.persona).map(k => `<div class="ai-block" style="margin-top:8px;"><span class="tag" style="color:${pColor(k)}"><span class="dot" style="background:${pColor(k)}"></span>${P[k].name} (lời giải mẫu của nhóm)</span><div>${esc(cur.reference[k])}</div></div>`).join(""); });
+    // Cùng đáp án, hồ sơ khác: ưu tiên nội dung AI trong bộ nhớ (không gọi API), thiếu thì dùng lời giải mẫu của nhóm.
+    $("lnk-compare") && ($("lnk-compare").onclick = (e) => { e.preventDefault(); $("compare-out").innerHTML = ["nonit", "dev", "dataai"].filter(k => k !== state.persona).map(k => {
+      const hit = M.get("diagnose", cur, k, state.answer), fromAI = Boolean(hit?.parsed?.explanation);
+      return `<div class="ai-block" style="margin-top:8px;"><span class="tag" style="color:${pColor(k)}"><span class="dot" style="background:${pColor(k)}"></span>${P[k].name} (${fromAI ? "AI · bộ nhớ" : "lời giải mẫu của nhóm"})</span><div>${esc(fromAI ? hit.parsed.explanation : cur.reference[k])}</div></div>`;
+    }).join(""); });
   }
 
   function recordTime() { if (state.tStart) { state.stats.times.push(Math.round((Date.now() - state.tStart) / 1000)); state.tStart = null; } }
@@ -349,7 +375,7 @@
         ai = {
           verdict: outputs[0].output.verdict,
           needs_clarification: false,
-          _mode: window.AI.mode(),
+          _mode: outputs[0].output._mode || window.AI.mode(),
           _latency_ms: Math.max(...outputs.map(x => x.output._latency_ms || 0)),
           _compare_outputs: outputs
         };
@@ -366,7 +392,7 @@
         state.history.push({ question_id: q().id, answer: state.answer, verdict: ai.verdict });
         recordTime();
         if (state.step < 3) state.step = 3;
-        show($("sec-followup"), state.persona !== "mentor");
+        show($("sec-followup"), FOLLOWUP_ENABLED && state.persona !== "mentor");
       }
     } catch (e) { state.error = e.message; }
     state.busy = false; render();
@@ -435,47 +461,104 @@
   }
 
 
-  /* ---------- SINH TRỰC TIẾP (nút cho giám khảo) + bảng log ----------
-   * Mỗi lần bấm: với câu đang chọn, gọi model thật cho 3 hồ sơ × {hint, diagnose},
-   * options.no_cache = true → server bỏ qua cache, luôn gọi API. Hint vừa sinh được nạp
-   * vào state.liveHints để nút "Xem gợi ý" dùng ngay. Log lưu localStorage để còn sau F5. */
+  /* ---------- BỘ NHỚ AI (tab Tech) + bảng log ----------
+   * Sinh một lần: mỗi mục còn thiếu (câu × hồ sơ × {gợi ý | mọi đáp án}) gọi model thật qua
+   * AI.explainLive → server ghi file cache (write-through) → M.put lưu bản sao localStorage.
+   * Sau đó "Kiểm tra"/xem gợi ý chỉ đọc M.get, không gọi API. Log lưu localStorage để còn sau F5. */
   const LIVEGEN_KEY = "enigma_livegen_log_v1";
   let genLog = [];
   try { genLog = JSON.parse(localStorage.getItem(LIVEGEN_KEY) || "[]"); } catch (_) { genLog = []; }
-  let genBusy = false, genOpen = null, promptInfo = null;
-  function persistGenLog() { try { localStorage.setItem(LIVEGEN_KEY, JSON.stringify(genLog.slice(-120))); } catch (_) {} }
+  let genOpen = null, promptInfo = null;
+  let memNote = null;          // cảnh báo hiển thị ở banner Demo + Tech (thiếu key, server lỗi, localStorage đầy…)
+  let memProgress = null;      // { done, total, fail } khi đang sinh
+  let autoGenTried = false;    // tự sinh khi vào Demo chỉ thử một lần mỗi lần tải trang
+  let appReady = false;
+  // System prompt giống nhau ở mọi dòng và đã xem được qua GET /api/prompt-info → không lưu lặp để đỡ đầy localStorage.
+  function persistGenLog() { try { localStorage.setItem(LIVEGEN_KEY, JSON.stringify(genLog.slice(-120).map(e => Object.assign({}, e, { system_prompt: null })))); } catch (_) {} }
 
   async function loadPromptInfo() {
     try { promptInfo = await window.AI.promptInfo(); } catch (_) { promptInfo = null; }
     renderLiveGen();
   }
 
-  /** Đáp án sai dùng để sinh phần "giải thích khi sai": ưu tiên lựa chọn hiện tại của người dùng nếu sai. */
-  function wrongAnswerFor(question) {
-    const keys = Object.keys(question.options || {});
-    const correct = String(question.correct || "").toUpperCase().split(/[\s,;|]+/).filter(Boolean);
-    const isWrong = (a) => a && !sameSet(a, question.correct, question.question_type);
-    if (question.id === q().id && isWrong(state.answer)) return state.answer;
-    const distractor = keys.find(k => !correct.includes(k));
-    if (!question.question_type || question.question_type === "single_choice") return distractor || keys[0];
-    if (question.question_type === "ordering") { const r = correct.slice(); if (r.length > 1) { const t = r[0]; r[0] = r[1]; r[1] = t; } return r.join(", "); }
-    const partial = correct.slice(1).concat(distractor ? [distractor] : []);
-    return partial.sort().join(", ");
-  }
-  function sameSet(a, b, type) {
-    const tokens = v => String(v ?? "").toUpperCase().split(/[\s,;|]+/).filter(Boolean);
-    const aa = tokens(a), bb = tokens(b);
-    if (type === "ordering") return aa.join(",") === bb.join(",");
-    return aa.sort().join(",") === bb.sort().join(",");
+  /* ---------- chọn provider / model (tab Tech) ----------
+   * Đổi trên server lúc chạy (POST /api/config, chỉ provider+model; API key chỉ nằm trong server/.env).
+   * Lựa chọn nhớ trong localStorage và tự áp lại khi server khởi động lại. */
+  const MODEL_PREF_KEY = "enigma_model_pref_v2";
+  let providersInfo = null;
+  const apiBase = () => window.AI.settings().endpoint.replace(/\/$/, "");
+  function loadPref() { try { return JSON.parse(localStorage.getItem(MODEL_PREF_KEY) || "null"); } catch (_) { return null; } }
+  function savePref(p) { try { localStorage.setItem(MODEL_PREF_KEY, JSON.stringify(p)); } catch (_) {} }
+
+  async function postConfig(provider, model) {
+    const r = await fetch(apiBase() + "/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, model }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Server " + r.status);
+    return j;
   }
 
-  function genRequest(question, persona, mode, learnerAnswer) {
+  function pickerProvider() { return providersInfo?.providers.find(x => x.id === $("mp-provider").value) || null; }
+
+  function fillModels(pid, wanted) {
+    const p = providersInfo.providers.find(x => x.id === pid);
+    const sel = $("mp-model"), isMock = pid === "mock";
+    const cur = wanted || p.default_model;
+    const opts = p.models.map(m => `<option value="${esc(m.id)}">${esc(m.label)} · ${esc(m.price)}</option>`);
+    if (!isMock && cur && !p.models.some(m => m.id === cur)) opts.push(`<option value="${esc(cur)}">${esc(cur)} (đang cấu hình)</option>`);
+    if (!isMock) opts.push('<option value="__custom">Khác… (nhập tên model)</option>');
+    sel.innerHTML = opts.join("");
+    if (!isMock) sel.value = cur;
+    sel.disabled = isMock;
+    $("mp-custom").hidden = sel.value !== "__custom";
+    updatePickerState();
+  }
+
+  function updatePickerState() {
+    const p = pickerProvider(), act = providersInfo?.active;
+    if (!p) return;
+    const busy = M.isBusy();
+    $("btn-mp-apply").disabled = !p.configured || busy;
+    const missing = !p.configured ? `<span style="color:var(--amber-text)">Thiếu <b>${esc(p.key_env)}</b> trong <b>server/.env</b> (thêm key rồi restart server).</span> ` : "";
+    $("mp-status").innerHTML = `${missing}Đang chạy: <b>${esc(act ? act.provider : "—")}</b>${act?.model ? " · <b>" + esc(act.model) + "</b>" : ""}${busy ? " · <i>đang sinh bộ nhớ, chờ xong mới đổi được</i>" : ""}`;
+  }
+
+  function renderModelPicker() {
+    if (!providersInfo || !$("mp-provider")) return;
+    const act = providersInfo.active;
+    $("mp-provider").innerHTML = providersInfo.providers.map(p => `<option value="${esc(p.id)}">${esc(p.label)}${p.configured ? "" : " (thiếu key)"}</option>`).join("");
+    $("mp-provider").value = providersInfo.providers.some(p => p.id === act.provider) ? act.provider : "mock";
+    fillModels($("mp-provider").value, $("mp-provider").value === act.provider ? act.model : null);
+  }
+
+  async function applyModelChoice(provider, model) {
+    const j = await postConfig(provider, model);
+    providersInfo.active = j.active;
+    savePref({ provider: j.active.provider, model: j.active.model });
+    serverGen = j.generation || serverGen;
+    memNote = null;
+    await loadPromptInfo();
+    try { await M.sync(apiBase(), BANK); } catch (_) {}
+    renderModelPicker();
+    render();
+  }
+
+  async function loadProviders() {
+    try { providersInfo = await (await fetch(apiBase() + "/api/providers")).json(); } catch (_) { providersInfo = null; }
+    if (!providersInfo || !providersInfo.providers) { providersInfo = null; $("mp-status").textContent = "Không đọc được /api/providers (server chưa chạy hoặc là bản cũ, cần restart)."; return; }
+    const pref = loadPref(), act = providersInfo.active;
+    if (pref && (pref.provider !== act.provider || pref.model !== act.model)) {
+      try { await applyModelChoice(pref.provider, pref.model); return; } catch (_) { /* thiếu key/không hợp lệ: giữ cấu hình server */ }
+    }
+    renderModelPicker();
+  }
+
+  function genRequest(question, persona, mode, learnerAnswer, noCache) {
     return {
       mode, persona, persona_style: P[persona].style,
       question: { id: question.id, topic: question.topic, stem: question.stem, options: question.options, correct: question.correct, question_type: question.question_type || "single_choice", anchors: question.anchors, anchor_confidence: question.anchor_confidence },
       learner_answer: mode === "hint" ? null : learnerAnswer,
       attempt: 1, hint_viewed: false, history: [],
-      options: { no_cache: true }
+      options: { no_cache: Boolean(noCache) }   // true = "Tạo lại": bỏ qua cache server, luôn gọi model
     };
   }
 
@@ -485,20 +568,23 @@
     return [out.misconception && `Nhận định lỗi: ${out.misconception}`, out.hint && `Gợi ý: ${out.hint}`, out.explanation && `Giải thích: ${out.explanation}`].filter(Boolean).join("\n");
   }
 
-  async function runOneGen(question, persona, mode, learnerAnswer) {
+  /** Một lời gọi tới server cho một mục bộ nhớ; ghi một dòng vào genLog. Trả { entry, out } (out = null nếu lỗi). */
+  async function runOneGen(item, noCache) {
+    const { question, persona, mode, answer: learnerAnswer } = item;
     const entry = {
       id: "gen_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       ts: new Date().toISOString(), question_id: question.id, persona, mode,
       learner_answer: mode === "hint" ? null : learnerAnswer,
       status: "running", model: serverGen?.model || null, provider: serverGen?.provider || null,
-      api: serverGen?.api || null, effort: serverGen?.effort || null, endpoint: serverGen?.endpoint || null,
+      api: serverGen?.api || null, effort: serverGen?.effort || null, thinking: serverGen?.thinking || null, output_format: serverGen?.output_format || null, endpoint: serverGen?.endpoint || null,
       prompt_version: null, system_prompt: null, user_prompt: null, raw_response: null, output: null, output_text: "",
       usage: null, cost: null, latency_ms: null, cached: false, validation: null, error: null
     };
     genLog.push(entry); persistGenLog(); renderLiveGen();
     const t0 = performance.now();
+    let out = null;
     try {
-      const out = await window.AI.explainLive(genRequest(question, persona, mode, learnerAnswer));
+      out = await window.AI.explainLive(genRequest(question, persona, mode, learnerAnswer, noCache));
       const g = out._generation || {};
       Object.assign(entry, {
         status: "ok", model: out._usage?.model || g.model || entry.model, provider: g.provider || entry.provider, api: g.api || entry.api,
@@ -509,39 +595,75 @@
         output: { verdict: out.verdict, misconception: out.misconception, hint: out.hint, explanation: out.explanation, citation: out.citation, no_source_note: out.no_source_note },
         output_text: outputText(mode, out)
       });
-      if (mode === "hint" && out.hint) {
-        state.liveHints[`${question.id}:${persona}`] = { hint: out.hint, flagged: false, meta: Object.assign({}, g, { model: entry.model, generated_live: true, at: entry.ts }) };
-        delete hintJobErrors[`${question.id}:${persona}`];
-      }
-      if (mode === "diagnose") state.liveExplains[`${question.id}:${persona}`] = entry.output;
     } catch (e) {
+      out = null;
       Object.assign(entry, { status: "error", error: e.message || String(e), latency_ms: Math.round(performance.now() - t0) });
     }
-    persistGenLog(); renderLiveGen(); renderQuiz();
-    return entry;
+    persistGenLog(); renderLiveGen();
+    return { entry, out };
   }
 
-  async function runLiveGen(questions) {
-    if (genBusy) return;
-    genBusy = true; renderLiveGen();
-    const personas = ["nonit", "dev", "dataai"];
-    let done = 0; const total = questions.length * personas.length * 2;
-    for (const question of questions) {
-      const wrong = wrongAnswerFor(question);
-      const jobs = [];
-      for (const persona of personas) {
-        jobs.push(runOneGen(question, persona, "hint", null).then(() => { done++; renderProgress(done, total, question); }));
-        jobs.push(runOneGen(question, persona, "diagnose", wrong).then(() => { done++; renderProgress(done, total, question); }));
-      }
-      renderProgress(done, total, question);
-      await Promise.all(jobs); // 6 lời gọi song song cho mỗi câu, tuần tự giữa các câu để không dồn rate limit
+  /** Worker cho M.generate: gọi model, kiểm tra có nội dung, trả mục để lưu. Lỗi 401/403/501/mất kết nối là .fatal → dừng cả đợt. */
+  async function memWorker(item, noCache) {
+    const { entry, out } = await runOneGen(item, noCache);
+    if (!out) {
+      const err = new Error(entry.error || "lỗi không rõ");
+      err.fatal = /^Server (401|403|501)\b|Failed to fetch|NetworkError|credit balance|billing|api key|API_KEY_INVALID|PERMISSION_DENIED/i.test(entry.error || "");
+      throw err;
     }
-    genBusy = false; renderLiveGen(); renderQuiz();
+    if (item.mode === "hint" && !out.hint) throw new Error("Model không trả gợi ý");
+    if (item.mode === "diagnose" && !out.explanation) throw new Error("Model không trả lời giải");
+    return M.toEntry(out);
   }
-  function renderProgress(done, total, question) {
-    const el = $("livegen-progress");
-    show(el, genBusy);
-    if (genBusy) el.innerHTML = `<span class="loading"><i></i><i></i><i></i></span> Đang gọi <b>${esc(modelLabel())}</b> · ${done}/${total} lời gọi xong · câu ${esc(question.id)}…`;
+
+  /** Đưa bộ nhớ về đủ theo thứ tự rẻ → đắt: bản sao localStorage → file cache server (GET) → sinh bằng model thật.
+   * opts.generate: được phép sinh; opts.manual: do người dùng bấm nút (bỏ qua giới hạn "tự sinh một lần");
+   * opts.force: sinh lại toàn bộ, bỏ qua cache. Bộ nhớ đã đủ thì không có request nào. */
+  async function ensureMemory(opts) {
+    const o = opts || {};
+    if (M.isBusy()) return;
+    const ep = window.AI.settings().endpoint.replace(/\/$/, "");
+    memNote = null;
+    let todo = o.force ? M.plan(BANK).slice() : M.missing(BANK);
+    if (!todo.length) { render(); return; }
+    if (!o.force) {
+      try { await M.sync(ep, BANK); todo = M.missing(BANK); }
+      catch (e) { memNote = `Không đọc được cache server (${e.message || e}).`; }
+      if (!todo.length) { memNote = null; render(); return; }
+    }
+    if (!o.generate || (!o.manual && autoGenTried)) { render(); return; }
+    if (!o.manual) autoGenTried = true;
+
+    let info = null;
+    try { info = await (await fetch(ep + "/api/health")).json(); } catch (_) {}
+    if (!info) { memNote = "Không kết nối được server để sinh bộ nhớ AI. Đang dùng lời giải mẫu của nhóm."; render(); return; }
+    if (!info.configured || info.provider === "mock") { memNote = "Server chưa cấu hình AI thật (AI_PROVIDER và API key trong server/.env, hoặc chọn provider ở tab Tech) nên chưa sinh được bộ nhớ AI. Đang dùng lời giải mẫu của nhóm."; render(); return; }
+    serverGen = info.generation || serverGen;
+
+    memProgress = { done: 0, total: todo.length, fail: 0 };
+    render();
+    const res = await M.generate(todo, (item) => memWorker(item, Boolean(o.force)), { onProgress: (p) => { memProgress = p; renderMemoryStatus(); renderChrome(); } });
+    memProgress = null;
+    if (res.aborted) memNote = `Dừng vì lỗi: ${res.lastError}. Đã sinh ${res.ok}/${todo.length} mục.`;
+    else if (res.fail) memNote = `${res.fail}/${todo.length} lời gọi lỗi (${res.lastError}). Bấm "Tạo câu gợi ý cho bộ câu hỏi" để thử lại các mục còn thiếu.`;
+    if (!res.saved) memNote = (memNote ? memNote + " " : "") + "Không lưu được bản sao trong trình duyệt (localStorage đầy hoặc bị chặn): bộ nhớ chỉ dùng được đến khi tải lại trang. Bấm \"Xoá log\" ở tab Tech rồi tải lại để lấy từ cache server.";
+    render();
+  }
+
+  /** Dòng trạng thái ở tab Tech, thanh tiến độ, banner ở tab Demo và trạng thái hai nút. */
+  function renderMemoryStatus() {
+    const busy = M.isBusy(), s = M.status(BANK), full = s.total > 0 && s.have === s.total;
+    $("btn-memory-gen").disabled = busy; $("btn-memory-regen").disabled = busy;
+    $("btn-memory-gen").textContent = busy ? "Đang sinh…" : "Tạo câu gợi ý cho bộ câu hỏi";
+    const running = busy && memProgress;
+    const progress = running ? `<span class="loading"><i></i><i></i><i></i></span> Đang gọi <b>${esc(modelLabel())}</b> · ${memProgress.done}/${memProgress.total} lời gọi xong${memProgress.fail ? ` · ${memProgress.fail} lỗi` : ""}…` : "";
+    show($("livegen-progress"), Boolean(running)); if (running) $("livegen-progress").innerHTML = progress;
+    $("memory-status").innerHTML = `Bộ nhớ AI: <b>${s.have}/${s.total}</b> mục${s.model ? ` · model <b>${esc(s.model)}</b>` : ""}${s.at ? ` · cập nhật ${esc(new Date(s.at).toLocaleString("vi-VN"))}` : ""}${full ? " · <b>đủ, trả lời không cần gọi model</b>" : ""}${s.warned ? ` · ${s.warned} mục có cảnh báo kiểm tra` : ""}${memNote ? `<br><span style="color:var(--amber-text)">${esc(memNote)}</span>` : ""}`;
+    // Banner ở tab Demo: người xem lần đầu cần biết vì sao "Kiểm tra" đang khoá.
+    const banner = $("memory-banner");
+    banner.hidden = !running && !memNote;
+    banner.style.background = running ? "" : "var(--amber-bg)"; banner.style.color = running ? "" : "var(--amber-text)";
+    banner.innerHTML = running ? `${progress}<div class="small" style="margin-top:4px;">Lần đầu bộ nhớ còn trống nên AI đang sinh nội dung cho cả bộ câu hỏi. Xong sẽ trả lời tức thì, không gọi AI nữa.</div>` : esc(memNote || "");
   }
 
   const money = (v) => v == null ? "n/a" : (v < 0.01 ? "$" + v.toFixed(5) : "$" + v.toFixed(4));
@@ -549,9 +671,7 @@
 
   function renderLiveGen() {
     if (!$("sec-livegen")) return;
-    $("btn-livegen").disabled = genBusy; $("btn-livegen-all").disabled = genBusy;
-    $("btn-livegen").textContent = genBusy ? "Đang sinh…" : `⚡ Sinh cho câu hiện tại (${q().id})`;
-    if (!genBusy) show($("livegen-progress"), false);
+    renderMemoryStatus();
 
     // Panel cấu hình + tổng hợp
     const g = serverGen || promptInfo?.generation || {};
@@ -569,7 +689,7 @@
       kv("Provider", esc(g.provider || "—")),
       kv("Model", esc(g.model || "—")),
       kv("API", esc(g.api || "—")),
-      kv("Effort / thinking", esc(g.effort ? g.effort + " · adaptive" : "—")),
+      kv("Effort / thinking", esc(g.effort ? g.effort + " · " + (g.thinking || "adaptive") : (g.thinking || "—"))),
       kv("Prompt version", esc(promptInfo?.prompt_version || okRows.slice(-1)[0]?.prompt_version || "—")),
       kv("Đơn giá ($/1M token)", rate && rate.rate_in_per_mtok != null ? `in ${rate.rate_in_per_mtok} · out ${rate.rate_out_per_mtok}` : "—"),
       kv("Lời gọi đã sinh", `${okRows.length}${errCount ? ` · ${errCount} lỗi` : ""}`, "total"),
@@ -583,7 +703,7 @@
     // Bảng log
     const rows = genLog.slice().reverse();
     $("livegen-count").textContent = rows.length ? `(${rows.length})` : "";
-    if (!rows.length) { $("livegen-table").innerHTML = `<tbody><tr><td class="lg-empty">Chưa có lời gọi nào. Bấm "Sinh cho câu hiện tại" để gọi model thật.</td></tr></tbody>`; return; }
+    if (!rows.length) { $("livegen-table").innerHTML = `<tbody><tr><td class="lg-empty">Chưa có lời gọi nào. Bấm "Tạo câu gợi ý cho bộ câu hỏi" để gọi model thật (bộ nhớ đã đủ thì không có lời gọi nào).</td></tr></tbody>`; return; }
     const head = `<thead><tr><th>Giờ</th><th>Câu</th><th>Hồ sơ</th><th>Loại</th><th>Model</th><th>Kết quả</th><th class="num">Token in/out</th><th class="num">Chi phí</th><th class="num">Độ trễ</th><th>Trạng thái</th></tr></thead>`;
     const body = rows.map(e => {
       const st = e.status === "running" ? `<span class="st run">đang gọi</span>` : e.status === "error" ? `<span class="st err">lỗi</span>` : e.cached ? `<span class="st cache">cache</span>` : `<span class="st ok">API thật</span>`;
@@ -606,7 +726,7 @@
       const result = e.mode === "hint"
         ? `<b>Gợi ý:</b> ${esc(o.hint || "(trống)")}`
         : `${o.misconception ? `<b>Nhận định lỗi:</b> ${esc(o.misconception)}<br>` : ""}${o.hint ? `<b>Gợi ý:</b> ${esc(o.hint)}<br>` : ""}<b>Giải thích:</b> ${esc(o.explanation || "(trống)")}${o.citation ? `<br><span class="small">Trích dẫn [${esc(o.citation.code)}] “${esc(o.citation.quote)}”</span>` : o.no_source_note ? `<br><span class="small">Không có nguồn: ${esc(o.no_source_note)}</span>` : ""}`;
-      const info = { provider: e.provider, model: e.model, api: e.api, endpoint: e.endpoint, effort: e.effort, thinking: "adaptive", output_format: "json_schema (structured outputs)", prompt_version: e.prompt_version, cached: e.cached, latency_ms: e.latency_ms, usage: e.usage, cost: e.cost, validation: e.validation };
+      const info = { provider: e.provider, model: e.model, api: e.api, endpoint: e.endpoint, effort: e.effort, thinking: e.thinking || null, output_format: e.output_format || null, prompt_version: e.prompt_version, cached: e.cached, latency_ms: e.latency_ms, usage: e.usage, cost: e.cost, validation: e.validation };
       const detail = `<tr class="lg-detail"><td colspan="10">
         <div class="grid2">
           <div class="blk" style="grid-column:1/-1"><div class="t">Kết quả model trả về (đã parse)</div><div class="result">${result}</div></div>
@@ -632,21 +752,19 @@
   function goStep(n) {
     state.step = n;
     show($("sec-persona"), n === 1);
-    show($("sec-intro"), n === 1);
     show($("sec-quiz"), n >= 2);
-    show($("sec-livegen"), n >= 2);
-    show($("sec-followup"), n === 3 && state.checked);
+    show($("sec-followup"), FOLLOWUP_ENABLED && n === 3 && state.checked);
     render();
     // Prefetch ngay khi vào câu hỏi. Người dùng vẫn làm bài bình thường; nếu
     // mở gợi ý sớm, renderQuiz sẽ hiện trạng thái chờ cho tới khi job hoàn tất.
     if (n >= 2 && !state.checked) void loadLiveHints();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (currentTab === "demo") window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function resetQuestion() { state.answer = null; state.checked = false; state.hintOpen = false; state.hintViewed = false; state.hintBusy = false; state.hintError = null; state.ai = null; state.error = null; state.tStart = null; state.feedback = {}; $("followup-out").innerHTML = ""; $("followup-text").value = ""; }
   function nextQuestion() { if (state.qIndex < BANK.length - 1) { state.qIndex += 1; resetQuestion(); goStep(2); } }
   function prevQuestion() { if (state.qIndex > 0) { state.qIndex -= 1; resetQuestion(); goStep(2); } }
 
-  /* ---------- trace drawer ---------- */
+  /* ---------- trace (tab Tech) ---------- */
   function traceSafe(value) {
     return String(value ?? "");
   }
@@ -683,9 +801,11 @@
   function guideContent() {
     if (state.step === 1) return { n: "1", d2: false, do: "Chọn hồ sơ học viên (Non-IT · IT/Dev · Data/AI).", see: "Đây là đầu vào của tính năng: cùng câu hỏi, lời giải thích sẽ đổi theo hồ sơ này. Chọn “Chưa rõ” để xem hệ thống hỏi lại thay vì đoán." };
     if (state.step === 2 && !state.checked) return { n: "2", d2: false, do: "Chọn một đáp án rồi bấm Kiểm tra (nộp câu, không chọn lại). Gợi ý: câu 7, chọn C.", see: "Bước này giống VLearn hiện tại. Nút “Xem gợi ý” trước khi nộp là phần AI sinh theo hồ sơ (D2), gợi ý không lộ đáp án." };
-    if (state.busy) return { n: "3", d2: true, do: "AI đang chẩn đoán lỗi và soạn lời giải thích theo hồ sơ…", see: "Mỗi lời gọi được ghi vào Trace (prompt, phản hồi thô, độ trễ)." };
+    if (state.busy) return window.AI.isLive()
+      ? { n: "3", d2: true, do: "AI đang chẩn đoán lỗi và soạn lời giải thích theo hồ sơ…", see: "Mỗi lời gọi được ghi vào Trace ở tab Tech (prompt, phản hồi thô, độ trễ)." }
+      : { n: "3", d2: true, do: "Đang lấy chẩn đoán và lời giải thích theo hồ sơ từ bộ nhớ AI…", see: "Mỗi lượt được ghi vào Trace ở tab Tech; nội dung do AI sinh một lần và lưu sẵn, không gọi model lúc trả lời." };
     if (state.ai?.needs_clarification) return { n: "3", d2: true, do: "Hồ sơ chưa rõ → AI hỏi lại. Chọn một nhóm để tiếp tục.", see: "Lớp ② mơ hồ: không đoán hồ sơ, không giải thích khi chưa biết người nghe là ai." };
-    if (state.checked) return { n: "3", d2: true, do: "Đọc khối “Học từ lỗi”: giả định đang nhầm → gợi ý → giải thích theo hồ sơ. Rồi bấm “So sánh với hồ sơ khác”.", see: "Đây là tính năng chính: đáp án đúng không đổi, chỉ cách giảng đổi. Xem mã trích dẫn [Txx-NNN] hoặc ghi chú “chưa có nguồn”. Thử ô “Hỏi thêm” với “deadline nộp lab là khi nào?” để thấy từ chối an toàn." };
+    if (state.checked) return { n: "3", d2: true, do: "Đọc khối “Học từ lỗi”: giả định đang nhầm → gợi ý → giải thích theo hồ sơ. Rồi bấm “So sánh với hồ sơ khác”.", see: "Đây là tính năng chính: đáp án đúng không đổi, chỉ cách giảng đổi. Xem mã trích dẫn [Txx-NNN] hoặc ghi chú “chưa có nguồn”." + (FOLLOWUP_ENABLED ? " Thử ô “Hỏi thêm” với “deadline nộp lab là khi nào?” để thấy từ chối an toàn." : "") };
     return null;
   }
   function renderGuide() {
@@ -706,16 +826,41 @@
     if (state.hintOpen && !state.checked) window.AI.logEvent({ event: "open_pre_submit_hint", question_id: q().id, persona: state.persona, hint_available: Boolean(hintFor().text) });
   });
   $("btn-back-persona").addEventListener("click", () => goStep(1));
-  // TẠM COMMENT: khoá 2 nút gọi API AI thật để user test UI không bấm spam tốn phí.
-  // Bỏ comment 2 dòng dưới (và bỏ "disabled" trên 2 nút trong index.html) khi cần demo AI thật.
-  // $("btn-livegen").addEventListener("click", () => runLiveGen([q()]));
-  // $("btn-livegen-all").addEventListener("click", () => runLiveGen(BANK.slice()));
+  // Chống bấm spam tốn phí: "Tạo câu gợi ý" chỉ sinh mục còn thiếu (đủ rồi thì không gọi gì);
+  // "Tạo lại toàn bộ" bỏ qua cache nên luôn hỏi xác nhận kèm số lời gọi và chi phí ước tính.
+  $("btn-memory-gen").addEventListener("click", () => ensureMemory({ generate: true, manual: true }));
+  $("btn-memory-regen").addEventListener("click", () => {
+    const n = M.plan(BANK).length;
+    if (confirm(`Tạo lại toàn bộ bộ nhớ AI?\n\n${n} lời gọi model, bỏ qua cache, ước tính ≈ $${(n * EST_USD_PER_CALL).toFixed(2)} và có thể mất vài phút.`)) ensureMemory({ generate: true, manual: true, force: true });
+  });
+  const qc = $("qcount");
+  qc.max = QCOUNT_MAX; qc.value = questionCount;
+  qc.addEventListener("change", async () => {
+    if (M.isBusy()) { qc.value = questionCount; return; }
+    const n = clampCount(qc.value);
+    qc.value = n;
+    if (n === questionCount) return;
+    questionCount = n;
+    try { localStorage.setItem(QCOUNT_KEY, String(n)); } catch (_) {}
+    BANK = window.QUESTION_BANK.slice(0, n);
+    if (state.qIndex >= BANK.length) { state.qIndex = BANK.length - 1; resetQuestion(); }
+    try { await M.sync(apiBase(), BANK); } catch (_) {}
+    render();
+  });
+  M.onChange(() => { renderChrome(); renderMemoryStatus(); renderQuiz(); if (providersInfo) updatePickerState(); });
+  $("mp-provider").addEventListener("change", () => fillModels($("mp-provider").value, null));
+  $("mp-model").addEventListener("change", () => { $("mp-custom").hidden = $("mp-model").value !== "__custom"; if (!$("mp-custom").hidden) $("mp-custom").focus(); });
+  $("btn-mp-apply").addEventListener("click", async () => {
+    const pid = $("mp-provider").value, model = $("mp-model").value === "__custom" ? $("mp-custom").value.trim() : ($("mp-model").disabled ? "" : $("mp-model").value);
+    if ($("mp-model").value === "__custom" && !model) { $("mp-status").textContent = "Hãy nhập tên model."; return; }
+    $("btn-mp-apply").disabled = true; $("mp-status").textContent = "Đang áp dụng…";
+    try { await applyModelChoice(pid, model); }
+    catch (e) { updatePickerState(); $("mp-status").innerHTML += `<br><span style="color:var(--red)">${esc(e.message || e)}</span>`; }
+  });
   $("btn-livegen-export").addEventListener("click", exportGenLog);
   $("btn-livegen-clear").addEventListener("click", () => { if (confirm("Xoá bảng log sinh trực tiếp?")) { genLog = []; genOpen = null; persistGenLog(); renderLiveGen(); } });
   $("btn-followup").addEventListener("click", runFollowup);
   $("followup-text").addEventListener("keydown", (e) => { if (e.key === "Enter") runFollowup(); });
-  $("btn-trace").addEventListener("click", () => { $("drawer").classList.toggle("open"); });
-  $("btn-close-drawer").addEventListener("click", () => $("drawer").classList.remove("open"));
   $("btn-export").addEventListener("click", () => window.Trace.exportJSONL());
   $("btn-clear").addEventListener("click", () => { if (confirm("Xoá toàn bộ trace trong trình duyệt?")) window.Trace.clear(); });
   $("btn-settings").addEventListener("click", openSettings);
@@ -735,22 +880,36 @@
   });
   window.Trace.onChange(renderTrace);
 
-  // Khối giới thiệu đề: thu gọn/mở rộng, nhớ lựa chọn trong trình duyệt.
-  const INTRO_KEY = "enigma_intro_collapsed";
-  function setIntro(collapsed) {
-    $("sec-intro").classList.toggle("collapsed", collapsed);
-    $("btn-intro-toggle").textContent = collapsed ? "Xem mô tả đề" : "Thu gọn";
-    $("btn-intro-toggle").setAttribute("aria-expanded", String(!collapsed));
-    try { localStorage.setItem(INTRO_KEY, collapsed ? "1" : "0"); } catch (_) {}
+  // 3 tab: info / demo / tech. Nhớ tab trong trình duyệt, đồng bộ location.hash.
+  const TAB_KEY = "enigma_tab", TABS = ["info", "demo", "tech"];
+  function setTab(name) {
+    if (!TABS.includes(name)) name = "info";
+    currentTab = name;
+    TABS.forEach(t => {
+      show($("tab-" + t), t === name);
+      $("tab-btn-" + t).setAttribute("aria-selected", String(t === name));
+    });
+    try { localStorage.setItem(TAB_KEY, name); } catch (_) {}
+    if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+    window.scrollTo({ top: 0 });
+    // Vào Live demo: bộ nhớ AI thiếu thì lấy từ cache server, vẫn thiếu thì sinh (một lần mỗi lần tải trang).
+    if (appReady && name === "demo") void ensureMemory({ generate: true });
   }
-  let introCollapsed = false;
-  try { introCollapsed = localStorage.getItem(INTRO_KEY) === "1"; } catch (_) {}
-  setIntro(introCollapsed);
-  $("btn-intro-toggle").addEventListener("click", () => setIntro(!$("sec-intro").classList.contains("collapsed")));
+  TABS.forEach(t => $("tab-btn-" + t).addEventListener("click", () => setTab(t)));
+  $("btn-go-demo").addEventListener("click", () => setTab("demo"));
+  window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.includes(h) && h !== currentTab) setTab(h); });
 
-  // ?persona=dev|nonit|dataai|mentor → vào thẳng bước 2 (tiện cho demo/quay video).
+  // ?persona=dev|nonit|dataai|mentor → vào thẳng bước 2 ở tab Live demo (tiện cho demo/quay video).
   const qsPersona = new URLSearchParams(location.search).get("persona");
-  if (qsPersona && P[qsPersona]) { state.persona = qsPersona; goStep(2); } else goStep(1);
+  let initialTab = location.hash.slice(1);
+  if (!TABS.includes(initialTab)) { try { initialTab = localStorage.getItem(TAB_KEY); } catch (_) { initialTab = null; } }
+  if (qsPersona && P[qsPersona]) { state.persona = qsPersona; initialTab = "demo"; }
+  setTab(initialTab);
+  if (qsPersona && P[qsPersona]) goStep(2); else goStep(1);
   void loadServerInfo();
   void loadPromptInfo();
+  void loadProviders();
+  // Khởi tạo xong: luôn đồng bộ bộ nhớ từ cache server (GET, không phải AI); chỉ sinh nếu đang ở tab Demo.
+  appReady = true;
+  void ensureMemory({ generate: currentTab === "demo" });
 })();

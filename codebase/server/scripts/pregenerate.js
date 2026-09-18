@@ -4,7 +4,7 @@
  * codebase/server/cache/explain-cache.json. Sau đó UI bấm "Kiểm tra" chỉ
  * đọc cache, không gọi model.
  *
- *   node codebase/server/scripts/pregenerate.js                    # Q07,Q16,Q13
+ *   node codebase/server/scripts/pregenerate.js                    # Q01,Q02,Q03 (3 câu đang demo)
  *   node codebase/server/scripts/pregenerate.js --questions Q07,Q01
  *   node codebase/server/scripts/pregenerate.js --force            # sinh lại cả key đã có
  *
@@ -17,11 +17,13 @@ const path = require("path");
 const vm = require("vm");
 const { spawn } = require("child_process");
 const cache = require("../cache");
+// Một nguồn duy nhất cho khoá + tập đáp án (multi_select: mọi tổ hợp) — trùng với bộ nhớ phía UI.
+const { answersFor } = require("../../js/ai-memory.js");
 
 const JS_DIR = path.resolve(__dirname, "..", "..", "js");
 const argv = process.argv.slice(2);
 const arg = (name, def) => { const i = argv.indexOf(name); return i > -1 ? argv[i + 1] : def; };
-const QUESTIONS = String(arg("--questions", "Q07,Q16,Q13")).split(",").map(s => s.trim()).filter(Boolean);
+const QUESTIONS = String(arg("--questions", "Q01,Q02,Q03")).split(",").map(s => s.trim()).filter(Boolean);
 const PERSONAS = ["nonit", "dev", "dataai"];
 const FORCE = argv.includes("--force");
 const CONCURRENCY = Number(arg("--concurrency", 4));
@@ -32,18 +34,6 @@ function loadBrowserData(file, key) {
   const ctx = { window: {} };
   vm.runInNewContext(fs.readFileSync(path.join(JS_DIR, file), "utf8"), ctx);
   return ctx.window[key];
-}
-
-/* Các phương án cần sinh: single_choice → từng option; multi_select → từng option
- * đơn + tổ hợp đúng (người xem chọn tổ hợp khác sẽ rơi về gọi model trực tiếp). */
-function answersFor(q) {
-  const keys = Object.keys(q.options || {});
-  if ((q.question_type || "single_choice") === "multi_select") {
-    const set = new Set(keys);
-    set.add(String(q.correct).toUpperCase().split(/[\s,;|]+/).filter(Boolean).sort().join(", "));
-    return [...set];
-  }
-  return keys;
 }
 
 function makeRequest(q, persona, personaStyle, mode, answer) {
@@ -80,7 +70,7 @@ async function main() {
     jobs.push({ label: `${q.id} ${pk.padEnd(6)} hint`, req: makeRequest(q, pk, style, "hint") });
     for (const ans of answersFor(q)) jobs.push({ label: `${q.id} ${pk.padEnd(6)} ${ans}`, req: makeRequest(q, pk, style, "diagnose", ans) });
   }
-  const todo = FORCE ? jobs : jobs.filter(j => !cache.get(cache.cacheKey(j.req)));
+  const todo = FORCE ? jobs : jobs.filter(j => !cache.get(cache.cacheKey(j.req, require("../model").activeScope())));
   console.log(`${targets.map(q => q.id).join(", ")} × ${PERSONAS.length} persona → ${jobs.length} key, cần sinh ${todo.length}${FORCE ? " (force)" : ""}`);
   if (!todo.length) { console.log("Cache đã đủ. Dùng --force để sinh lại."); return; }
 

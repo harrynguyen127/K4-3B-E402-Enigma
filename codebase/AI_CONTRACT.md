@@ -88,6 +88,17 @@ Hành vi UI liên quan (theo VLearn thật): **"Kiểm tra" = nộp câu**, đá
 
 `{ "event": "open_pre_submit_hint", "trace_id", "question_id", "persona", "hint_viewed" }` → append `server/logs/events.jsonl`. Explanation được hiển thị ngay sau khi chấm, không còn luồng hai bậc.
 
+## 3c-bis. `GET /api/memory[?questions=Q01,Q02]` — bộ nhớ AI cho UI (không gọi model)
+
+Trả nội dung đã sinh sẵn trong `server/cache/explain-cache.json`, bỏ `prompt`/`raw_response` cho nhẹ:
+
+```jsonc
+{ "enabled": true, "generated_at": "2026-09-19T…Z",
+  "entries": { "diagnose|Q01|dev|A,C": { "parsed": { /* §3 */ }, "generation": { "provider": "…", "model": "…" },
+                                        "usage": { /* token */ }, "validation": [ /* cảnh báo, rỗng nếu ổn */ ], "cached_at": "…" } } }
+```
+Khoá = `mode|question_id|persona|đáp án chuẩn hoá` (hint dùng `-`). UI (`js/ai-memory.js`) gọi endpoint này khi bộ nhớ trình duyệt thiếu, lưu vào `localStorage`, và từ đó trả lời chỉ đọc bản sao. `EXPLAIN_CACHE=off` → `entries` rỗng.
+
 ## 3d. `POST /api/feedback` — phản hồi của học viên (không cần model)
 
 ```jsonc

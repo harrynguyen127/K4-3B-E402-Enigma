@@ -2,7 +2,7 @@
   "name": "enigma-d2-server",
   "version": "0.1.0",
   "private": true,
-  "description": "Proxy server cho demo D2 'Học từ lỗi' — gọi Claude (Anthropic API), OpenRouter hoặc Ollama",
+  "description": "Proxy server cho demo D2 'Học từ lỗi' — gọi Claude (Anthropic API), Google Gemini, OpenRouter hoặc Ollama",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

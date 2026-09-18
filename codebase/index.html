@@ -16,23 +16,28 @@
     <div class="titles">
       <div class="eyebrow">Học từ lỗi · Cá nhân hóa theo hồ sơ</div>
       <h1>Cùng một câu hỏi, cùng một đáp án đúng — lời giảng theo đúng hồ sơ của bạn</h1>
-      <div class="subtitle">Học viên nộp câu trả lời trước. Khi sai, AI chỉ ra đúng giả định đang nhầm, gợi ý một bước, rồi mới giải thích theo nền tảng nghề nghiệp (Non-IT · Data/AI · IT/Dev), kèm trích dẫn transcript buổi học.</div>
     </div>
     <div class="actions">
-      <button class="mode-badge live" id="mode-badge" title="Xem cấu hình AI"><span class="dot"></span><span id="mode-label">LIVE · đang kiểm tra server…</span></button>
-      <button class="btn" id="btn-trace">Trace <span id="trace-count" class="small">(0)</span></button>
+      <button class="mode-badge mock" id="mode-badge" title="Xem cấu hình AI"><span class="dot"></span><span id="mode-label">DEMO · đang kiểm tra bộ nhớ AI…</span></button>
       <button class="btn ghost" id="btn-settings" title="Cài đặt AI">⚙</button>
     </div>
   </div>
 
-  <!-- ===== GIỚI THIỆU ĐỀ (hiện ở bước 1; nội dung theo File_Tu_lam/Track_da_chon.md) ===== -->
+  <!-- ===== TABS ===== -->
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Chế độ xem">
+    <button class="tab" role="tab" id="tab-btn-info" data-tab="info" aria-controls="tab-info" aria-selected="true">Thông tin</button>
+    <button class="tab" role="tab" id="tab-btn-demo" data-tab="demo" aria-controls="tab-demo" aria-selected="false">Live demo</button>
+    <button class="tab" role="tab" id="tab-btn-tech" data-tab="tech" aria-controls="tab-tech" aria-selected="false">Tech <span id="trace-count" class="small">(0)</span></button>
+  </nav>
+
+  <!-- ===== TAB 1: THÔNG TIN ===== -->
+  <div class="tab-panel" id="tab-info" role="tabpanel" aria-labelledby="tab-btn-info">
   <section class="card pad intro" id="sec-intro">
     <div class="intro-head">
       <div>
         <div class="label">Đề D2 · Cá nhân hóa học tập theo hồ sơ học viên</div>
         <h2>Tính năng này là gì và giải quyết vấn đề gì?</h2>
       </div>
-      <button class="btn ghost sm" id="btn-intro-toggle" aria-expanded="true">Thu gọn</button>
     </div>
     <div class="intro-body" id="intro-body">
       <div class="intro-col pain">
@@ -53,8 +58,18 @@
         </ul>
       </div>
     </div>
-    <div class="small intro-foot">Thử ngay: chọn hồ sơ ở Bước 1, làm câu 7 (temperature), trả lời sai rồi xem lời giải thích. Bấm "So sánh với hồ sơ khác" để thấy cùng đáp án nhưng khác cách giảng.</div>
+    <div class="row intro-foot">
+      <button class="btn primary" id="btn-go-demo">Thử ngay ở tab Live demo →</button>
+      <span class="small">Chọn hồ sơ, làm câu 7 (temperature), trả lời sai rồi xem lời giải thích. Bấm "So sánh với hồ sơ khác" để thấy cùng đáp án nhưng khác cách giảng.</span>
+    </div>
   </section>
+  </div>
+
+  <!-- ===== TAB 2: LIVE DEMO ===== -->
+  <div class="tab-panel" id="tab-demo" role="tabpanel" aria-labelledby="tab-btn-demo" hidden>
+
+  <!-- ===== BỘ NHỚ AI: tiến độ sinh lần đầu / cảnh báo (nội dung trong app.js → renderMemoryStatus) ===== -->
+  <div class="livegen-progress" id="memory-banner" hidden style="margin-bottom:12px;"></div>
 
   <!-- ===== STEPPER ===== -->
   <div class="stepper" id="stepper">
@@ -129,42 +144,13 @@
         <div id="followup-out"></div>
       </section>
 
-      <!-- SINH TRỰC TIẾP: nút gọi model thật ngay trước mặt giám khảo + bảng log (model, prompt, token, chi phí).
-           Đặt cuối cột chính để không chen vào luồng làm quiz chính. -->
-      <section class="card pad stack livegen" id="sec-livegen" hidden>
-        <div class="livegen-head">
-          <div>
-            <div class="label">Sinh trực tiếp bằng AI thật <span class="tour-tag d2">D2</span></div>
-            <h2 style="font-size:18px;margin-top:4px;">Gọi model ngay tại chỗ để sinh gợi ý và lời giải theo 3 hồ sơ</h2>
-            <div class="small">Bấm nút: hệ thống gửi 6 lời gọi (3 hồ sơ × gợi ý + giải thích) tới model đang cấu hình, <b>bỏ qua cache</b>. Kết quả vừa sinh được dùng làm gợi ý cho câu hỏi trong demo. Mỗi lời gọi ghi một dòng vào bảng log bên dưới: model, system prompt, prompt, phản hồi, token, chi phí.</div>
-          </div>
-          <!-- TẠM TẮT: tránh user test bấm spam tốn API thật. Bỏ "disabled" + title khi cần demo gọi AI thật. -->
-          <div class="row livegen-actions">
-            <button class="btn primary" id="btn-livegen" disabled title="Tạm khoá khi test UI — ">⚡ Sinh cho câu hiện tại</button>
-            <button class="btn" id="btn-livegen-all" disabled title="Tạm khoá khi test UI — ">Sinh cả 3 câu demo</button>
-          </div>
-        </div>
-        <div class="livegen-config" id="livegen-config"></div>
-        <div class="livegen-progress" id="livegen-progress" hidden></div>
-        <div class="livegen-log">
-          <div class="row" style="justify-content:space-between;align-items:center;">
-            <div class="label">Bảng log lời gọi AI <span class="small" id="livegen-count"></span></div>
-            <div class="row">
-              <button class="btn sm" id="btn-livegen-export">Xuất JSONL</button>
-              <button class="btn sm danger" id="btn-livegen-clear">Xoá log</button>
-            </div>
-          </div>
-          <div class="table-wrap"><table class="lg-table" id="livegen-table"></table></div>
-        </div>
-      </section>
-
     </div>
 
     <!-- ===== SIDEBAR ===== -->
     <aside class="sb">
       <div class="sb-card">
         <div class="label">Tiến độ lượt này</div>
-        <div class="sb-big"><span id="sb-done">0</span><span class="sb-of">/ 20</span></div>
+        <div class="sb-big"><span id="sb-done">0</span><span class="sb-of" id="sb-total">/ 20</span></div>
         <div class="progress-track"><div class="progress-fill" id="sb-progress" style="width:0%"></div></div>
         <div class="small" id="sb-score"></div>
       </div>
@@ -178,6 +164,79 @@
         <div style="font-size:18px;font-weight:700;margin-top:2px;" id="sb-profile-name">Chưa chọn</div>
         <div style="font-size:12px;opacity:.85;margin-top:2px;" id="sb-profile-desc">Chọn hồ sơ ở bước 1.</div>
       </div>
+      <div class="sb-card" id="sb-sources">
+        <div class="label">Nguồn trích dẫn</div>
+        <div class="small" id="sb-anchors">Chọn câu hỏi để xem AI được phép trích dẫn đoạn nào.</div>
+      </div>
+    </aside>
+  </div>
+  </div>
+
+  <!-- ===== TAB 3: TECH ===== -->
+  <div class="tab-panel" id="tab-tech" role="tabpanel" aria-labelledby="tab-btn-tech" hidden>
+
+    <!-- BỘ NHỚ AI: sinh một lần bằng model thật → lưu → demo chỉ đọc lại (không gọi API khi trả lời). Bảng log: model, prompt, token, chi phí. -->
+    <section class="card pad stack livegen" id="sec-livegen">
+      <div class="livegen-head">
+        <div>
+          <div class="label">Bộ nhớ AI · sinh một lần, dùng lại <span class="tour-tag d2">D2</span></div>
+          <h2 style="font-size:18px;margin-top:4px;">Tạo gợi ý và lời giải theo 3 hồ sơ cho cả bộ câu hỏi demo</h2>
+          <div class="small">Lần đầu vào Live demo mà bộ nhớ còn trống (hoặc khi bấm nút bên phải), hệ thống gọi model thật cho từng câu × hồ sơ × đáp án, rồi lưu vào file cache trên server (model chọn ở khung bên dưới) và bản sao trong trình duyệt. Từ đó, chọn đáp án, Kiểm tra và xem gợi ý chỉ đọc bộ nhớ, <b>không gọi API AI nào</b>. Mỗi lời gọi ghi một dòng vào bảng log bên dưới: model, system prompt, prompt, phản hồi, token, chi phí.</div>
+          <div class="small" id="memory-status" style="margin-top:6px;"></div>
+        </div>
+        <div class="row livegen-actions">
+          <button class="btn primary" id="btn-memory-gen" title="Chỉ sinh các mục còn thiếu; bộ nhớ đã đủ thì không gọi model">Tạo câu gợi ý cho bộ câu hỏi</button>
+          <button class="btn" id="btn-memory-regen" title="Gọi lại model cho toàn bộ mục, bỏ qua cache (tốn phí)">Tạo lại toàn bộ…</button>
+        </div>
+      </div>
+      <div class="model-picker" id="sec-qcount">
+        <div class="label">Số câu hỏi tạo lời giải thích</div>
+        <div class="mp-row">
+          <input type="number" id="qcount" min="1" max="20" step="1" value="3" aria-label="Tổng số câu hỏi tạo lời giải thích">
+          <span class="small">câu (mặc định 3, tối đa 20). Đổi số câu cũng đổi số câu trong Live demo; chỉ các mục còn thiếu mới bị gọi model.</span>
+        </div>
+      </div>
+      <div class="model-picker" id="sec-model">
+        <div class="label">Provider và model AI</div>
+        <div class="mp-row">
+          <select id="mp-provider" aria-label="Provider AI"></select>
+          <select id="mp-model" aria-label="Model"></select>
+          <input type="text" id="mp-custom" placeholder="tên model, vd gemini-3.6-flash" aria-label="Tên model tuỳ ý" hidden>
+          <button class="btn primary" id="btn-mp-apply">Áp dụng</button>
+        </div>
+        <div class="small" id="mp-status">Đang đọc danh sách provider…</div>
+        <div class="small">Đổi có hiệu lực ngay trên server, không cần restart. API key <b>không</b> nhập ở đây: đặt trong <code>server/.env</code> (<code>ANTHROPIC_API_KEY</code>, <code>GEMINI_API_KEY</code>…) rồi restart server một lần. Bộ nhớ AI được lưu riêng theo từng provider + model: đổi model thì cần tạo bộ nhớ mới, quay lại model cũ vẫn dùng lại bản đã sinh.</div>
+      </div>
+      <div class="livegen-config" id="livegen-config"></div>
+      <div class="livegen-progress" id="livegen-progress" hidden></div>
+      <div class="livegen-log">
+        <div class="row" style="justify-content:space-between;align-items:center;">
+          <div class="label">Bảng log lời gọi AI <span class="small" id="livegen-count"></span></div>
+          <div class="row">
+            <button class="btn sm" id="btn-livegen-export">Xuất JSONL</button>
+            <button class="btn sm danger" id="btn-livegen-clear">Xoá log</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table class="lg-table" id="livegen-table"></table></div>
+      </div>
+    </section>
+
+    <!-- TRACE: mỗi mục = 1 lượt xử lý -->
+    <section class="card pad stack" id="sec-trace">
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <div>
+          <div class="label">Trace lời gọi AI</div>
+          <div class="small">Mỗi mục = 1 lượt xử lý: request → prompt → phản hồi thô → JSON đã parse → phản hồi học viên.</div>
+        </div>
+        <div class="row">
+          <button class="btn sm" id="btn-export">Xuất JSONL</button>
+          <button class="btn sm danger" id="btn-clear">Xoá</button>
+        </div>
+      </div>
+      <div class="trace-list" id="trace-list"></div>
+    </section>
+
+    <div class="tech-side">
       <div class="sb-card">
         <div class="label">Chỉ số học (phiên này)</div>
         <div class="stat"><span>Câu đã nộp</span><b id="st-checked">0</b></div>
@@ -187,37 +246,21 @@
         <div class="stat"><span>Phản hồi 👍 / 👎</span><b><span id="st-up">0</span> / <span id="st-down">0</span></b></div>
         <div class="small">Đây là chỉ số "học được" mà track D yêu cầu — không chỉ "AI trả lời đúng".</div>
       </div>
-      <div class="sb-card" id="sb-sources">
-        <div class="label">Nguồn trích dẫn</div>
-        <div class="small" id="sb-anchors">Chọn câu hỏi để xem AI được phép trích dẫn đoạn nào.</div>
-      </div>
-      <div class="sb-card" id="sb-related-files">
+      <div class="sb-card" id="tech-files">
         <div class="label">Tệp liên quan</div>
-        <div class="small">Đổi nhóm hồ sơ: bấm <b>← Đổi hồ sơ</b> bất kỳ lúc nào.<br>Bản CP2: <a href="prototype.html">prototype.html</a><br>Hợp đồng AI: <code>AI_CONTRACT.md</code><br>Golden set: <code>../eval/golden_set.json</code></div>
+        <div class="small">Bản CP2: <a href="prototype.html">prototype.html</a><br>Hợp đồng AI: <code>AI_CONTRACT.md</code><br>Golden set: <code>../eval/golden_set.json</code></div>
       </div>
-    </aside>
+    </div>
   </div>
 
   <div class="footer">Nhóm Enigma · Trợ giảng AI cá nhân hóa</div>
-</div>
-
-<!-- ===== TRACE DRAWER ===== -->
-<div class="drawer" id="drawer">
-  <div class="dh">
-    <h3>Trace lời gọi AI</h3>
-    <button class="btn sm" id="btn-export">Xuất JSONL</button>
-    <button class="btn sm danger" id="btn-clear">Xoá</button>
-    <button class="btn sm ghost" id="btn-close-drawer">✕</button>
-  </div>
-  <div class="small" style="padding:8px 20px 0;">Mỗi mục = 1 lượt xử lý: request → prompt → phản hồi thô → JSON đã parse → phản hồi học viên.</div>
-  <div class="db" id="trace-list"></div>
 </div>
 
 <!-- ===== SETTINGS MODAL ===== -->
 <div class="modal-bg" id="modal">
   <div class="modal">
     <h3 style="font-size:18px;">Cài đặt lời gọi AI</h3>
-    <label class="radio-row on" id="rr-mock"><input type="radio" name="prov" value="mock" checked><div><b>DEMO (mặc định)</b> — nút "Kiểm tra" không gọi API AI; verdict, chẩn đoán và giải thích lấy từ dữ liệu đã gen sẵn (<code>data.questions.js</code> · <code>data.hints.js</code>), không tốn phí, không cần server.</div></label>
+    <label class="radio-row on" id="rr-mock"><input type="radio" name="prov" value="mock" checked><div><b>DEMO (mặc định)</b> — nút "Kiểm tra" không gọi API AI; chẩn đoán, gợi ý và giải thích đọc từ bộ nhớ AI (sinh một lần bằng model thật, lưu ở server và trình duyệt). Mục chưa có trong bộ nhớ dùng lời giải mẫu của nhóm (<code>data.questions.js</code>). Không tốn phí lúc trả lời.</div></label>
     <label class="radio-row" id="rr-live"><input type="radio" name="prov" value="live"><div><b>LIVE</b> — hint và explanation được sinh trực tiếp bởi model cấu hình trong <code>server/.env</code> (mặc định Claude qua Anthropic API; có thể đổi sang Ollama local). Chỉ dùng khi cần test pipeline thật.</div></label>
     <div>
       <div class="label">Endpoint server (chỉ dùng khi chọn LIVE)</div>
@@ -237,6 +280,7 @@
 <script src="js/data.questions.js"></script>
 <script src="js/data.personas.js"></script>
 <script src="js/data.hints.js"></script>
+<script src="js/ai-memory.js"></script>
 <script src="js/trace.js"></script>
 <script src="js/ai-client.js"></script>
 <script src="js/app.js"></script>

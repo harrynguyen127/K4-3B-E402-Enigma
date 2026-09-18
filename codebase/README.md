@@ -8,23 +8,27 @@ cp .env.example .env                # điền ANTHROPIC_API_KEY
 node server.js                      # → http://localhost:8787
 ```
 
-Mở `http://localhost:8787`. UI mặc định gọi **Claude (Anthropic API)** qua server: `AI_PROVIDER=anthropic`, `ANTHROPIC_MODEL=claude-opus-5`, `ANTHROPIC_EFFORT=medium`. Response dùng **structured outputs** (JSON schema theo `AI_CONTRACT.md`) nên không còn lỗi parse JSON. Muốn chạy hoàn toàn local, đổi `AI_PROVIDER=ollama` (Qwen 2.5 7B, không cần key, không cần npm install).
+Mở `http://localhost:8787`. UI mặc định gọi **Google Gemini** qua server: `AI_PROVIDER=gemini`, `GEMINI_MODEL=gemini-3.6-flash`. Claude vẫn dùng được (`AI_PROVIDER=anthropic`, `ANTHROPIC_MODEL=claude-opus-5`, `ANTHROPIC_EFFORT=medium`. Response dùng **structured outputs** (JSON schema theo `AI_CONTRACT.md`) nên không còn lỗi parse JSON. Gemini cần `GEMINI_API_KEY`. Có thể đổi provider/model ngay ở tab **Tech** (khung "Provider và model AI") mà không restart; API key vẫn chỉ đặt trong `server/.env`, và bộ nhớ AI được lưu riêng theo từng provider + model. Muốn chạy hoàn toàn local, đổi `AI_PROVIDER=ollama` (Qwen 2.5 7B, không cần key, không cần npm install).
 
 Trước mỗi lời giải, server tự tìm tối đa 3 đoạn trong transcript bằng retrieval local, hoàn toàn độc lập với persona. Có đoạn đủ liên quan thì phản hồi kèm mã `[Txx-NNN]`; không có thì model vẫn giải thích bằng kiến thức chung và hiển thị ghi chú rõ rằng không có nguồn buổi học phù hợp.
 
-## Data pack (không nằm trong repo)
+## Bộ nhớ AI — sinh một lần, trả lời không gọi model
 
-`data/vlearn-pack/` (chatlog + transcript) là dữ liệu BTC cấp riêng, **không được commit** vào repo công khai (`data/` đã gitignore). Retrieval transcript ([server/retrieval.js](server/retrieval.js)) cần bản cục bộ: đặt `TRANSCRIPT_DIR=<đường dẫn tới thư mục transcript>` trong `server/.env` (xem `.env.example`), hoặc chép data pack vào `data/vlearn-pack/`. Thiếu data thì server vẫn chạy nhưng retrieval tắt: log khởi động in `CẢNH BÁO`, `/api/health` báo `retrieval.available = false`, và mọi câu dùng fallback "không có nguồn" (citation = null). Khi chạy golden set phải có data pack, nếu không các case kỳ vọng citation sẽ trượt vì thiếu nguồn chứ không phải vì AI sai.
+Luồng: **lần đầu vào tab Live demo mà bộ nhớ còn trống** (hoặc bấm **Tạo câu gợi ý cho bộ câu hỏi** ở tab Tech) → AI sinh nội dung cho cả bộ Q01–Q03 → lưu vào file cache trên server và bản sao `localStorage` → từ đó **chọn đáp án, Kiểm tra, xem gợi ý, so sánh hồ sơ, mentor đều chỉ đọc bộ nhớ, không có request `/api/*` nào**.
 
-## Kết quả sinh sẵn (cache) — demo không gọi model lúc bấm "Kiểm tra"
+Bộ nhớ gồm **207 mục** cho Q01–Q03: 9 gợi ý (3 câu × 3 hồ sơ) + 198 chẩn đoán/giải thích (Q01 và Q02 mỗi câu 31 tổ hợp đáp án × 3 hồ sơ, Q03 4 đáp án × 3 hồ sơ). Khoá `mode|câu|hồ sơ|đáp án chuẩn hoá` do `js/ai-memory.js` định nghĩa, trùng với `cacheKey()` của `server/cache.js` (smoke test kiểm tra).
+
+Thứ tự khi bộ nhớ thiếu: `localStorage` → `GET /api/memory` (đọc file cache server, không phải AI) → sinh bằng model thật (`POST /api/explain`, server ghi write-through). Server không có key hoặc mất kết nối thì UI hiện cảnh báo và mục thiếu dùng lời giải mẫu của nhóm (nhãn MOCK), không tự gọi lại. Ô **Hỏi thêm** đang **ẩn** (`FOLLOWUP_ENABLED` trong `js/app.js`) vì câu gõ tự do không có bộ nhớ sẵn.
+
+**Nên sinh sẵn trước buổi demo** (ước tính ≈ 4 USD, suy từ test 18/09: 6 lời gọi ≈ 0,11 USD) rồi commit cache; nếu không, người đầu tiên mở Demo sẽ là người kích hoạt ~207 lời gọi và phải chờ:
 
 ```bash
-node codebase/server/scripts/pregenerate.js                     # Q07, Q16, Q13 × 3 persona × mọi phương án + hint
+node codebase/server/scripts/pregenerate.js                     # Q01,Q02,Q03 × 3 persona × mọi tổ hợp đáp án + hint
 node codebase/server/scripts/pregenerate.js --questions Q07,Q01 # chọn câu khác
 node codebase/server/scripts/pregenerate.js --force             # sinh lại
 ```
 
-Kết quả ghi vào `codebase/server/cache/explain-cache.json` (cố ý commit). Server đọc cache trước theo key `mode|question|persona|đáp án`; trúng thì trả ngay và UI ghi "Sinh sẵn lúc …"; trượt (câu khác, tổ hợp multi-select khác, hồ sơ "Chưa rõ", hỏi thêm, probe) thì gọi model như bình thường rồi tự thêm vào cache. Tắt cache: `EXPLAIN_CACHE=off`. `/api/health` cho biết cache có bao nhiêu mục theo câu.
+Kết quả ghi vào `codebase/server/cache/explain-cache.json` (cố ý commit). Server đọc cache trước theo key `mode|question|persona|đáp án`; trúng thì trả ngay; trượt thì gọi model như bình thường rồi tự thêm vào cache. Tắt cache: `EXPLAIN_CACHE=off`. `/api/health` cho biết cache có bao nhiêu mục theo câu; `GET /api/memory?questions=Q01,Q02` trả nội dung gọn (không có prompt/raw) cho UI.
 
 Smoke test không cần key:
 
@@ -45,9 +49,10 @@ Có thể mở thẳng `codebase/index.html` bằng trình duyệt (file://) —
 | `server/model.js` | `callModel()` — Anthropic (Claude, mặc định), OpenRouter, Ollama local, mock smoke provider | **AI Engineer** |
 | `server/cache.js`, `server/scripts/pregenerate.js` | Cache kết quả sinh sẵn theo câu × persona × đáp án; script sinh một lần | AI Engineer |
 | `server/scripts/generate-hints.js` | Batch sinh gợi ý 20 câu × 3 persona, tự gắn cờ nghi lộ đáp án | AI Engineer |
-| `js/ai-client.js` | Điểm gọi AI duy nhất `AI.explain()`; gọi server `/api/explain`; ghi trace | UI |
+| `js/ai-memory.js` | Bộ nhớ AI: khoá, tổ hợp đáp án (207 mục cho Q01–Q03), `localStorage`, đồng bộ từ `GET /api/memory`; dùng chung với Node | UI |
+| `js/ai-client.js` | Điểm gọi AI duy nhất `AI.explain()`: đọc bộ nhớ → mock → (chỉ khi sinh bộ nhớ) `/api/explain`; ghi trace | UI |
 | `js/trace.js` | Lưu prompt/raw/parsed từng lời gọi; xuất JSONL; chấm nhanh | UI |
-| `server/server.js` | HTTP: `POST /api/explain`, `POST /api/feedback`, static; deterministic grading; kiểm tra citation | UI |
+| `server/server.js` | HTTP: `POST /api/explain`, `GET /api/memory`, `POST /api/feedback`, static; deterministic grading; kiểm tra citation | UI |
 | `server/prompt.js` | System prompt + schema JSON (bản nháp) | AI Engineer |
 | `AI_CONTRACT.md` | Hợp đồng request/response giữa UI và AI | Đọc trước khi sửa |
 | `prototype.html` | Bản CP2 (giữ nguyên để đối chiếu) | — |
@@ -59,7 +64,7 @@ Hành vi giống VLearn thật: **"Kiểm tra" = nộp câu**, đáp án bị kh
 1. **Hồ sơ**: chọn *Non-IT* (ngoài đời xác định qua câu tự đánh giá lúc onboarding; người dùng luôn tự đổi được nếu chưa chắc).
 2. **Nộp câu trả lời**: bấm pill **7** (`Q07 · temperature`), chọn **C** (sai; đáp án đúng là A) → *Kiểm tra*. Các câu multi-select như Q01/Q17 cho phép chọn nhiều phương án; các câu mapping/ordering đã được chuyển thành các bộ đáp án hoàn chỉnh để chọn một phương án.
 3. **Học từ lỗi**: đáp án khoá, đáp án đúng hiện xanh; chẩn đoán, gợi ý và explanation cá nhân hóa xuất hiện cùng lúc trong một khối duy nhất. Bộ câu hỏi hiện chưa có transcript anchor đã xác minh nên UI hiển thị **chưa có trích dẫn** thay vì bịa mã nguồn. Bấm *So sánh với hồ sơ khác*: cùng đáp án, khác lời giảng. Bấm **👎 → "Không đúng trình độ của tôi" → Gửi** để cho thấy hệ thống thu phản hồi.
-4. **Chỗ khó**: ô *Hỏi thêm* gõ `deadline nộp lab là khi nào?` → từ chối an toàn (③). Pill **16** (`AI system design`) → chọn một bộ mapping hoàn chỉnh và xem fallback no-source. Hồ sơ *Chưa rõ* → hệ thống hỏi lại thay vì đoán (②).
+4. **Chỗ khó**: *(ô Hỏi thêm, từ chối an toàn ③, đang ẩn để demo không có lời gọi AI khi trả lời; bật lại bằng `FOLLOWUP_ENABLED = true` trong `js/app.js`)* Pill **16** (`AI system design`) → chọn một bộ mapping hoàn chỉnh và xem fallback no-source. Hồ sơ *Chưa rõ* → hệ thống hỏi lại thay vì đoán (②).
 5. Mở **Trace** → prompt + phản hồi thô + độ trễ + phản hồi học viên gắn theo từng lời gọi.
 
 ## Gợi ý trước-khi-nộp
@@ -79,14 +84,12 @@ Chưa chạy → nút "Xem gợi ý" hiện thông báo "chưa chạy sinh gợi
 - **Nguồn:** 20 câu giữ nội dung AI track; anchors để rỗng có chủ ý khi chưa có transcript mapping đã xác minh.
 - **Mock có chủ ý (không làm trong hackathon):** đọc CV để suy persona; dashboard giảng viên; lưu lịch sử lỗi giữa các phiên.
 
-## Nút "Sinh trực tiếp bằng AI thật" (cho giám khảo)
+## Tab Tech: nút tạo bộ nhớ AI + bảng log (cho giám khảo)
 
-Ở bước 2 (dưới card câu hỏi) có card **Sinh trực tiếp bằng AI thật** với hai nút:
+Card đầu tab **Tech** có hai nút và dòng trạng thái "Bộ nhớ AI: n/207 mục · model · lúc …":
 
-- **⚡ Sinh cho câu hiện tại**: gửi 6 lời gọi (3 hồ sơ × gợi ý + giải thích) tới model đang cấu hình trong `server/.env`, kèm `options.no_cache = true` nên server **bỏ qua cache** và luôn gọi API. Nút này gọi API thật kể cả khi giao diện đang ở chế độ dữ liệu sinh sẵn (`AI.explainLive`).
-- **Sinh cả 3 câu demo**: lặp tuần tự cho Q01–Q03 (18 lời gọi).
-
-Gợi ý vừa sinh được nạp ngay vào nút **Xem gợi ý** của câu đó (ưu tiên hơn dữ liệu sinh sẵn) và ghi write-through vào `server/cache/explain-cache.json`.
+- **Tạo câu gợi ý cho bộ câu hỏi**: chỉ sinh các mục còn thiếu (đọc cache server trước). Bộ nhớ đã đủ thì **không có request nào**, nên bấm nhầm không tốn phí. Gọi API thật qua `AI.explainLive`, concurrency 4; lỗi 401/403/501 hoặc mất kết nối dừng cả đợt thay vì đốt hàng trăm lời gọi hỏng.
+- **Tạo lại toàn bộ…**: gửi `options.no_cache = true` cho cả 207 mục (bỏ qua cache server). Luôn hỏi xác nhận kèm số lời gọi và chi phí ước tính.
 
 Bên dưới là **bảng log**: provider, model, API, effort, prompt version, đơn giá, tổng token in/out, chi phí ước tính, độ trễ trung bình, hai system prompt (bấm để mở), và mỗi dòng = một lời gọi (bấm dòng để xem system prompt, user prompt, phản hồi thô, usage, cost, validation). Log lưu trong `localStorage`, có nút **Xuất JSONL**.
 

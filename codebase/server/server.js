@@ -18,46 +18,54 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { buildPrompt, SYSTEM, HINT_SYSTEM, PROMPT_VERSION } = require("./prompt");
-const { callModel, parseModelJson, appendLog, lastModelUsage, estimateCost, anthropicModel } = require("./model");
+const { callModel, parseModelJson, appendLog, lastModelUsage, estimateCost, activeProvider, activeModel, activeScope, getRuntime, setRuntime, resetRuntime, listProviders, providerHasKey, geminiBase } = require("./model");
 const { retrieveAnchors, retrievalStatus } = require("./retrieval");
 const cache = require("./cache");
 
 const ROOT = path.resolve(__dirname, "..");           // codebase/
 const PORT = Number(process.env.PORT || 8787);
 
-function providerConfigured() {
-  const provider = String(process.env.AI_PROVIDER || "").trim().toLowerCase();
-  if (provider === "anthropic") return Boolean(String(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || "").trim());
-  if (provider === "openrouter") return Boolean(String(process.env.OPENROUTER_API_KEY || "").trim());
-  if (provider === "ollama") return Boolean(String(process.env.OLLAMA_URL || "http://localhost:11434").trim() && String(process.env.OLLAMA_MODEL || process.env.AI_MODEL || "qwen2.5:7b").trim());
-  if (provider === "mock") return true;
-  return false;
+function providerConfigured(provider = activeProvider()) {
+  if (provider === "ollama") return Boolean(String(process.env.OLLAMA_URL || "http://localhost:11434").trim() && String(activeModel("ollama") || "").trim());
+  return providerHasKey(provider);
 }
 
-function generationMetadata() {
-  const provider = String(process.env.AI_PROVIDER || "").trim().toLowerCase();
-  if (provider === "anthropic") return {
-    provider: "Anthropic (Claude)", api: "Anthropic Messages API (structured outputs)",
-    model: anthropicModel(),
-    endpoint: "https://api.anthropic.com/v1/messages",
-    effort: process.env.ANTHROPIC_EFFORT || "medium",
-    personalization: "Sinh trực tiếp theo persona: Non-IT, IT/Dev, Data/AI",
-    local: false
+const PERSONA_NOTE = "Sinh trực tiếp theo persona: Non-IT, IT/Dev, Data/AI";
+function generationMetadata(provider = activeProvider()) {
+  if (provider === "anthropic") {
+    const model = activeModel("anthropic");
+    const thinking = /^claude-(opus|sonnet|fable|mythos)-/.test(String(model));
+    return {
+      provider: "Anthropic (Claude)", api: "Anthropic Messages API (structured outputs)",
+      model, endpoint: "https://api.anthropic.com/v1/messages",
+      effort: thinking ? (process.env.ANTHROPIC_EFFORT || "medium") : null,
+      thinking: thinking ? "adaptive" : "không",
+      output_format: "json_schema (structured outputs)",
+      personalization: PERSONA_NOTE, local: false
+    };
+  }
+  if (provider === "gemini") return {
+    provider: "Google Gemini", api: "Gemini generateContent API (JSON mode)",
+    model: activeModel("gemini"),
+    endpoint: `${geminiBase()}/v1beta/models/${activeModel("gemini")}:generateContent`,
+    effort: null, thinking: "mặc định của model", output_format: "application/json (JSON mode, không ép schema)",
+    personalization: PERSONA_NOTE, local: false
   };
   if (provider === "ollama") return {
     provider: "Ollama (local)", api: "Ollama /api/chat",
-    model: process.env.OLLAMA_MODEL || process.env.AI_MODEL || "qwen2.5:7b",
+    model: activeModel("ollama"),
     endpoint: String(process.env.OLLAMA_URL || "http://localhost:11434").replace(/\/$/, "") + "/api/chat",
-    personalization: "Sinh trực tiếp theo persona: Non-IT, IT/Dev, Data/AI",
-    local: true
+    effort: null, thinking: "không", output_format: "json (format: json)",
+    personalization: PERSONA_NOTE, local: true
   };
   if (provider === "openrouter") return {
     provider: "OpenRouter", api: "OpenRouter Chat Completions API",
-    model: process.env.OPENROUTER_MODEL || process.env.AI_MODEL || "openrouter/free",
+    model: activeModel("openrouter"),
     endpoint: "https://openrouter.ai/api/v1/chat/completions",
+    effort: null, thinking: "không", output_format: "json_object",
     personalization: "Sinh trực tiếp theo persona", local: false
   };
-  return { provider: provider || "unconfigured", api: null, model: process.env.AI_MODEL || null, local: false };
+  return { provider: provider || "unconfigured", api: null, model: activeModel(provider) || null, local: false };
 }
 
 /* ---------------- kiểm tra tối thiểu theo AI_CONTRACT ---------------- */
@@ -218,9 +226,9 @@ const server = http.createServer(async (req, res) => {
     delete request.options;
     attachTranscriptEvidence(request);
     const prompt = buildPrompt(request);
-    const key = cache.cacheKey(request);
+    const provider = activeProvider();
+    const key = cache.cacheKey(request, activeScope());
     const hit = noCache ? null : cache.get(key);
-    const provider = String(process.env.AI_PROVIDER || "").toLowerCase();
     if (hit) {
       // Kết quả sinh sẵn: không gọi model. Vẫn ghi log để trace/eval biết đây là bản cache.
       const latency_ms = Date.now() - t0;
@@ -274,11 +282,33 @@ const server = http.createServer(async (req, res) => {
   // Thông tin cấu hình prompt cho bảng log "Sinh trực tiếp" (không lộ API key).
   if (req.method === "GET" && req.url === "/api/prompt-info") {
     const gen = generationMetadata();
-    return json(res, 200, { prompt_version: PROMPT_VERSION, system_prompt_explain: SYSTEM, system_prompt_hint: HINT_SYSTEM, generation: gen, pricing: estimateCost({ model: gen.model, input_tokens: 0, output_tokens: 0 }, String(process.env.AI_PROVIDER || "").toLowerCase()), configured: providerConfigured() });
+    return json(res, 200, { prompt_version: PROMPT_VERSION, system_prompt_explain: SYSTEM, system_prompt_hint: HINT_SYSTEM, generation: gen, pricing: estimateCost({ model: gen.model, input_tokens: 0, output_tokens: 0 }, activeProvider()), configured: providerConfigured() });
+  }
+
+  // Bộ nhớ AI cho UI: đọc file cache (không gọi model). ?questions=Q01,Q02 để lọc theo câu.
+  if (req.method === "GET" && (req.url === "/api/memory" || req.url.startsWith("/api/memory?"))) {
+    const ids = (new URL(req.url, "http://localhost").searchParams.get("questions") || "").split(",").map(s => s.trim()).filter(Boolean);
+    return json(res, 200, cache.slim(ids, activeScope()));
+  }
+
+  // Danh sách provider + model preset + trạng thái key (chỉ true/false, không lộ key).
+  if (req.method === "GET" && req.url === "/api/providers") {
+    return json(res, 200, { active: getRuntime(), providers: listProviders() });
+  }
+
+  // Đổi provider/model lúc chạy (RAM, mất khi restart). Key vẫn chỉ lấy từ .env.
+  if (req.method === "POST" && req.url === "/api/config") {
+    let cfg;
+    try { cfg = JSON.parse(await readBody(req)); } catch (_) { return json(res, 400, { error: "Body không phải JSON" }); }
+    if (!cfg || typeof cfg !== "object") return json(res, 400, { error: "Body không hợp lệ" });
+    try {
+      const active = cfg.reset ? resetRuntime() : setRuntime(cfg.provider, cfg.model);
+      return json(res, 200, { active, configured: providerConfigured(), scope: activeScope(), generation: generationMetadata() });
+    } catch (e) { return json(res, e.status || 400, { error: e.message }); }
   }
 
   if (req.method === "GET" && req.url === "/api/health") {
-    return json(res, 200, { ok: true, provider: process.env.AI_PROVIDER || null, configured: providerConfigured(), generation: generationMetadata(), retrieval: retrievalStatus(), cache: cache.status() });
+    return json(res, 200, { ok: true, provider: activeProvider() || null, model: activeModel() || null, scope: activeScope(), configured: providerConfigured(), generation: generationMetadata(), retrieval: retrievalStatus(), cache: cache.status() });
   }
 
   // static
@@ -300,7 +330,7 @@ function json(res, status, obj) {
 
 server.listen(PORT, () => {
   console.log(`Enigma D2 server → http://localhost:${PORT}`);
-  console.log(`AI_PROVIDER = ${process.env.AI_PROVIDER || "(chưa cấu hình → /api/explain trả 501; UI dùng MOCK)"}`);
+  console.log(`AI_PROVIDER = ${activeProvider() || "(chưa cấu hình → /api/explain trả 501; UI dùng MOCK)"}${activeProvider() ? " · model " + activeModel() : ""}`);
   const rs = retrievalStatus();
   console.log(rs.available ? `Retrieval: ${rs.chunks} đoạn transcript từ ${rs.transcript_dir}` : `CẢNH BÁO — ${rs.note}`);
 });

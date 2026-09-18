@@ -35,6 +35,22 @@ function makeRequest(persona, q, answer) {
   return { mode: "diagnose", persona, persona_style: persona, question: q, learner_answer: answer, attempt: 1, hint_viewed: false, history: [] };
 }
 
+/* Bộ nhớ AI phía UI (js/ai-memory.js) và cache server phải dùng CÙNG khoá: lệch khoá = trượt cache
+ * âm thầm và "Kiểm tra" rơi về mock. Bộ demo Q01–Q03 kỳ vọng 207 khoá (9 hint + 198 diagnose). */
+function checkMemoryKeys() {
+  const vm = require("vm"), fs = require("fs"), path = require("path");
+  const M = require("../../js/ai-memory.js"), cache = require("../cache");
+  const ctx = { window: {} };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "..", "js", "data.questions.js"), "utf8"), ctx);
+  const demo = ctx.window.QUESTION_BANK.slice(0, 3);
+  const items = M.plan(demo);
+  if (items.length !== 207 || new Set(items.map(x => x.key)).size !== 207) throw new Error(`demo memory plan: expected 207 unique keys, got ${items.length}`);
+  for (const it of items) {
+    const req = { mode: it.mode, persona: it.persona, question: { id: it.question.id, question_type: it.question.question_type || "single_choice" }, learner_answer: it.answer };
+    if (cache.cacheKey(req) !== it.key) throw new Error(`memory key mismatch: ${it.key} vs ${cache.cacheKey(req)}`);
+  }
+}
+
 async function waitForServer() {
   for (let i = 0; i < 40; i++) {
     try { const r = await fetch(`${base}/api/health`); if (r.ok) return r.json(); } catch (_) {}
@@ -47,6 +63,7 @@ async function main() {
   if (retrievalStatus().chunks < 1) throw new Error("transcript index is empty");
   const ragEvidence = retrieveAnchors({ topic: "RAG", stem: "RAG truy xuất tài liệu để bổ sung ngữ cảnh như thế nào?", options: { A: "retrieval tài liệu nội bộ và citation" }, correct: "A" });
   if (!ragEvidence.length || !ragEvidence.some(x => x.code === "T03-036" || x.code === "T05-110")) throw new Error("transcript retrieval did not find expected RAG evidence");
+  checkMemoryKeys();
   const child = spawn(process.execPath, [require("path").join(__dirname, "..", "server.js")], {
     env: Object.assign({}, process.env, { AI_PROVIDER: "mock", RETRIEVAL_DISABLED: "1", EXPLAIN_CACHE: "off", PORT: String(port) }),
     stdio: ["ignore", "pipe", "pipe"]
@@ -56,6 +73,8 @@ async function main() {
   try {
     const health = await waitForServer();
     if (health.provider !== "mock" || !health.configured) throw new Error("health provider/configured mismatch");
+    const memory = await (await fetch(`${base}/api/memory?questions=Q01,Q02`)).json();
+    if (!memory || typeof memory.entries !== "object" || Array.isArray(memory.entries)) throw new Error("GET /api/memory: bad shape");
     const outputs = [];
     for (const persona of ["nonit", "dev", "dataai"]) {
       const response = await fetch(`${base}/api/explain`, {
@@ -75,7 +94,7 @@ async function main() {
       assertParsed((await correctResponse.json()).parsed, "correct");
       assertParsed((await wrongResponse.json()).parsed, "incorrect");
     }
-    console.log("smoke ok: transcript retrieval + general-knowledge fallback + Q01 x 3 personas + deterministic grading/schema");
+    console.log("smoke ok: transcript retrieval + general-knowledge fallback + Q01 x 3 personas + deterministic grading/schema + AI-memory keys (207) + GET /api/memory");
   } finally {
     child.kill();
     if (stderr) process.stderr.write(stderr);

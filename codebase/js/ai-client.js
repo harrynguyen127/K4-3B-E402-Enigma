@@ -4,9 +4,14 @@
  * Giao diện duy nhất:  AI.explain(request) -> Promise<ExplainResponse>
  * Schema request/response: xem codebase/AI_CONTRACT.md
  *
- * Pipeline giao diện luôn dùng "live": POST {endpoint}/api/explain
- * → server/server.js → Qwen local qua Ollama. Mock chỉ còn là adapter nội bộ
- * phục vụ smoke test, không còn là lựa chọn trên giao diện demo.
+ * Ba đường xử lý của explain():
+ *   1. BỘ NHỚ (mặc định): diagnose/hint của hồ sơ nonit|dev|dataai đọc từ
+ *      window.AIMemory (nội dung AI đã sinh một lần, xem js/ai-memory.js) —
+ *      KHÔNG có lời gọi mạng nào.
+ *   2. MOCK: mục chưa có trong bộ nhớ (và unknown/followup/probe) dùng
+ *      mockExplain() — lời giải mẫu của nhóm, cũng không gọi mạng.
+ *   3. LIVE: chỉ khi forceLive (bộ nhớ đang sinh) hoặc dev bật LIVE trong ⚙:
+ *      POST {endpoint}/api/explain → server/server.js → model đã cấu hình.
  *
  * Mọi lời gọi đều đi qua Trace (prompt + raw response + latency) — yêu cầu CP3.
  * ===================================================================== */
@@ -15,9 +20,9 @@ window.AI = (function () {
   // Endpoint mặc định = origin của trang đang mở (http://localhost:8787 hoặc link tunnel);
   // khi mở bằng file:// thì rơi về localhost. Người xem qua tunnel không cần chỉnh ⚙.
   const sameOrigin = /^https?:$/.test(location.protocol) ? location.origin : "http://localhost:8787";
-  // Demo trên nút "Kiểm tra" KHÔNG được gọi API AI thật — luôn dùng dữ liệu đã gen sẵn
-  // (q.reference / HINT_BANK) qua mockExplain(). "live" vẫn còn để nhóm dev bật tay khi cần
-  // test pipeline thật, nhưng mặc định và mọi cấu hình cũ đều bị ép về "mock".
+  // Demo trên nút "Kiểm tra" KHÔNG được gọi API AI thật — đọc bộ nhớ AI đã sinh sẵn (AIMemory),
+  // mục nào chưa có thì rơi về mockExplain() (q.reference / HINT_BANK). "live" vẫn còn để nhóm dev
+  // bật tay khi cần test pipeline thật, nhưng mặc định và mọi cấu hình cũ đều bị ép về "mock".
   const defaults = { provider: "mock", endpoint: sameOrigin };
   let settings = Object.assign({}, defaults);
   try { settings = Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")); } catch (_) {}
@@ -147,15 +152,24 @@ window.AI = (function () {
     return JSON.parse(text);
   }
 
+  /* ---------------- BỘ NHỚ AI ---------------- */
+  /** Trúng → phản hồi đã parse lấy từ bộ nhớ; trượt → null (rơi về mock). Không bao giờ gọi mạng. */
+  function memoryLookup(req) {
+    const M = window.AIMemory;
+    if (!M || !["diagnose", "hint"].includes(req.mode) || !M.PERSONAS.includes(req.persona)) return null;
+    return M.get(req.mode, req.question, req.persona, req.learner_answer);
+  }
+
   /* ---------------- PUBLIC ---------------- */
   async function explain(request, opts) {
-    // opts.forceLive: nút "Sinh trực tiếp" trên demo — luôn gọi server/API thật, bất kể
-    // provider đang là mock (nút "Kiểm tra" vẫn dùng dữ liệu sinh sẵn theo cấu hình).
+    // opts.forceLive: chỉ dùng khi sinh bộ nhớ AI (tab Tech / lần đầu vào Demo) — luôn gọi
+    // server/API thật, bất kể provider là mock. Mọi lượt trả lời còn lại đi qua bộ nhớ hoặc mock.
     const useLive = settings.provider === "live" || Boolean(opts && opts.forceLive);
-    const mode = useLive ? "LIVE" : "MOCK";
+    const memHit = useLive ? null : memoryLookup(request);
+    const mode = useLive ? "LIVE" : memHit ? "MEMORY" : "MOCK";
     const traceMode = useLive ? "API" : mode;
     const t0 = performance.now();
-    const traceProvider = useLive ? settings.endpoint : "mock";
+    const traceProvider = useLive ? settings.endpoint : memHit ? "ai-memory" : "mock";
     const traceId = window.Trace.start({ mode: traceMode, provider: traceProvider, request });
     try {
       let parsed, raw = null, prompt = null;
@@ -171,6 +185,13 @@ window.AI = (function () {
         parsed._prompt_version = out.prompt_version || null;
         parsed._validation = out.validation || null;
         parsed._server_latency_ms = out.latency_ms ?? null;
+      } else if (memHit) {
+        const g = memHit.generation || {};
+        parsed = Object.assign({}, memHit.parsed, {
+          _generation: Object.assign({}, g, { cached: true, cached_at: memHit.cached_at, personalization: "Theo persona của học viên · lấy từ bộ nhớ AI" })
+        });
+        raw = JSON.stringify(memHit.parsed);
+        prompt = `[BỘ NHỚ AI — không gọi model; nội dung sinh lúc ${memHit.cached_at || "?"} bởi ${g.model || "model đã cấu hình"}]`;
       } else {
         await new Promise(r => setTimeout(r, 500 + Math.random() * 400)); // giả lập độ trễ
         parsed = mockExplain(request);
@@ -214,7 +235,10 @@ window.AI = (function () {
     return res.json();
   }
 
+  /** Gợi ý trước khi nộp: bộ nhớ AI → HINT_BANK (script sinh offline) → gợi ý mock cố định. */
   function precomputedHint(questionId, persona) {
+    const mem = window.AIMemory && window.AIMemory.get("hint", { id: questionId }, persona);
+    if (mem && mem.parsed.hint) return { hint: mem.parsed.hint, flagged: false, meta: Object.assign({}, mem.generation || {}, { from_memory: true, at: mem.cached_at }) };
     const saved = window.HINT_BANK?.[questionId]?.[persona];
     if (saved?.hint) return { hint: saved.hint, flagged: saved.flagged, meta: window.HINT_BANK_META || {} };
     if (settings.provider === "mock") return { hint: HINTS[persona] || null, flagged: false, meta: { model: "mock rule-based", simulated: true } };
