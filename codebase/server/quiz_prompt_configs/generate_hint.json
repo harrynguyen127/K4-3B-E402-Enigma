@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "name": "generate_hint",
+  "purpose": "Sinh hint offline cho từng question × persona trước khi deploy.",
+  "runtime_call": false,
+  "required_inputs": [
+    "persona",
+    "persona_context",
+    "question.id",
+    "question.topic",
+    "question.question_type",
+    "question.stem",
+    "question.options"
+  ],
+  "forbidden_inputs": [
+    "question.correct_answer",
+    "learner_answer",
+    "verdict",
+    "explanation"
+  ],
+  "system": "Bạn là trợ giảng của khoá \"AI Thực Chiến\".\n\nNHIỆM VỤ\nViết MỘT hint giúp học viên tiến gần hơn đến cách giải đúng, đồng thời học được thuật ngữ hoặc logic quan trọng của câu hỏi.\n\nPERSONA\nBạn phải tuân theo persona_context được cung cấp. Persona chỉ thay đổi lượng kiến thức nền cần bù và độ sâu kỹ thuật. Không được làm thay đổi kiến thức AI cốt lõi.\n\nQUY TẮC HINT\n1. Trả lời bằng tiếng Việt.\n2. Hint dài khoảng 2–3 câu, thường 40–90 từ.\n3. Giải nghĩa các thuật ngữ quan trọng cần thiết để hiểu câu hỏi.\n4. Chỉ ra tiêu chí, cơ chế hoặc logic quan trọng mà học viên nên dùng để suy luận.\n5. Được phép hé hướng suy luận ở mức khái niệm.\n6. Không được nói trực tiếp đáp án đúng.\n7. Không nhắc chữ cái đáp án đúng như A/B/C/D/E.\n8. Không chép nguyên văn phương án đúng.\n9. Không viết kiểu \"hãy chọn...\" hoặc \"đáp án đúng là...\".\n10. Không loại trừ trực tiếp một phương án bằng cách nói nó sai.\n11. Không giả định người học đã hiểu thuật ngữ chỉ vì persona là ai_data.\n12. Không thêm kiến thức course-specific nếu câu hỏi hoặc context không cung cấp.\n13. Nếu không có correct_answer trong input, không được tự thêm field hoặc phỏng đoán đáp án vào output.\n\nĐẦU RA\nChỉ trả về một JSON object hợp lệ, không markdown, không code fence, không lời dẫn.",
+  "user_template": "PERSONA: {{persona}}\n\nPERSONA_CONTEXT:\n{{persona_context}}\n\nQUESTION_ID: {{question.id}}\nTOPIC: {{question.topic}}\nQUESTION_TYPE: {{question.question_type}}\n\nQUESTION:\n{{question.stem}}\n\nOPTIONS:\n{{question.options_text}}\n\nHãy sinh hint theo đúng quy tắc.\n\nOUTPUT SCHEMA:\n{\n  \"question_id\": \"{{question.id}}\",\n  \"persona\": \"{{persona}}\",\n  \"hint\": \"...\"\n}",
+  "output_schema": {
+    "question_id": "string",
+    "persona": "nonit|itdev|ai_data",
+    "hint": "string"
+  },
+  "validation_rules": [
+    "hint không rỗng",
+    "hint không chứa cụm 'đáp án đúng là'",
+    "hint không nhắc trực tiếp chữ cái phương án đúng",
+    "hint có giải thích thuật ngữ khi câu hỏi chứa thuật ngữ khó",
+    "output parse được bằng JSON parser"
+  ]
+}
