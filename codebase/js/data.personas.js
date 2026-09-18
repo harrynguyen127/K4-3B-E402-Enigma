@@ -1,4 +1,4 @@
-/* Hồ sơ học viên (persona) — 3 nhóm chính theo Track_da_chon.md + trạng thái "chưa rõ".
+/* Hồ sơ học viên (persona) — 3 nhóm chính, chế độ mentor so sánh, và trạng thái "chưa rõ".
  * Mô tả `style` được đưa nguyên văn vào prompt (xem server/prompt.js) để AI đổi
  * CÁCH GIẢI THÍCH, không đổi câu hỏi hay đáp án đúng. */
 window.PERSONAS = {
@@ -25,6 +25,14 @@ window.PERSONAS = {
     badge: "Thuật ngữ ML, tập trung khái niệm",
     style: "Người học có nền tảng dữ liệu / ML. Giải thích bằng khái niệm mô hình: distribution, representation, training vs inference, trade-off. Được dùng ký hiệu toán ngắn khi cần; không cần ví dụ đời thường.",
     clarifier_option: "Tôi làm việc với dữ liệu / mô hình ML (phân tích, huấn luyện, đánh giá)."
+  },
+  mentor: {
+    key: "mentor",
+    name: "Mentor · So sánh cả 3",
+    short: "Xem đồng thời Non-IT, IT/Dev và Data/AI",
+    badge: "3 gợi ý + 3 lời giải trong một lần",
+    style: null,
+    clarifier_option: null
   },
   unknown: {
     key: "unknown",

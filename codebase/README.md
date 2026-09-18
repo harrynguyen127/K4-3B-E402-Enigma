@@ -6,7 +6,15 @@
 node codebase/server/server.js      # → http://localhost:8787  (Node ≥ 18, không cần npm install)
 ```
 
-Mở `http://localhost:8787`. Mặc định UI ở chế độ **MOCK** (không gọi AI). Bấm ⚙ → **LIVE** khi `codebase/server/.env` đã cấu hình và `callModel()` đã được hoàn thiện.
+Mở `http://localhost:8787`. UI mặc định gọi **Qwen 2.5 7B local** qua Ollama. Cấu hình nằm trong `codebase/server/.env`: `AI_PROVIDER=ollama`, `OLLAMA_MODEL=qwen2.5:7b`. Không cần API key và không gửi nội dung ra Internet.
+
+Trước mỗi lời giải, server tự tìm tối đa 3 đoạn trong transcript bằng retrieval local, hoàn toàn độc lập với persona. Có đoạn đủ liên quan thì phản hồi kèm mã `[Txx-NNN]`; không có thì model vẫn giải thích bằng kiến thức chung và hiển thị ghi chú rõ rằng không có nguồn buổi học phù hợp.
+
+Smoke test không cần key:
+
+```bash
+node codebase/server/scripts/smoke-test.js
+```
 
 Có thể mở thẳng `codebase/index.html` bằng trình duyệt (file://) — chỉ chạy được MOCK.
 
@@ -15,14 +23,14 @@ Có thể mở thẳng `codebase/index.html` bằng trình duyệt (file://) —
 | Đường dẫn | Vai trò | Ai phụ trách |
 |---|---|---|
 | `index.html`, `css/app.css`, `js/app.js` | Luồng demo 4 bước + panel Trace + cài đặt | UI (Tuấn) |
-| `js/data.questions.js` | 20 câu từ `golden_set.md` + lời giải mẫu 3 persona + **anchors transcript thật** | Nội dung (cả nhóm review) |
+| `js/data.questions.js` | 20 câu quiz AI track theo schema dev; multi-select dùng `question_type`, matching/ordering đã chuyển thành single-choice với các bộ đáp án hoàn chỉnh | Nội dung (cả nhóm review) |
 | `js/data.personas.js` | Mô tả 3 persona + "Chưa rõ" (đưa vào prompt) | Nội dung |
-| `js/data.hints.js` | Gợi ý trước-khi-nộp, **sinh tự động** bởi `server/scripts/generate-hints.js` | AI Engineer chạy script |
-| `server/model.js` | `callModel()` — điểm gọi model duy nhất | **AI Engineer** |
+| `js/data.hints.js` | Fallback Mock; ở chế độ local, gợi ý được Qwen 7B sinh trực tiếp khi bấm | AI Engineer |
+| `server/model.js` | `callModel()` — OpenRouter LIVE, Ollama local, mock smoke provider | **AI Engineer** |
 | `server/scripts/generate-hints.js` | Batch sinh gợi ý 20 câu × 3 persona, tự gắn cờ nghi lộ đáp án | AI Engineer |
-| `js/ai-client.js` | Điểm gọi AI duy nhất `AI.explain()`; provider mock/live; ghi trace | UI |
+| `js/ai-client.js` | Điểm gọi AI duy nhất `AI.explain()`; mặc định gọi Ollama local qua server; ghi trace | UI |
 | `js/trace.js` | Lưu prompt/raw/parsed từng lời gọi; xuất JSONL; chấm nhanh | UI |
-| `server/server.js` | HTTP: `POST /api/explain`, `POST /api/feedback`, static; log `server/logs/*.jsonl`; kiểm tra citation | UI |
+| `server/server.js` | HTTP: `POST /api/explain`, `POST /api/feedback`, static; deterministic grading; kiểm tra citation | UI |
 | `server/prompt.js` | System prompt + schema JSON (bản nháp) | AI Engineer |
 | `AI_CONTRACT.md` | Hợp đồng request/response giữa UI và AI | Đọc trước khi sửa |
 | `prototype.html` | Bản CP2 (giữ nguyên để đối chiếu) | — |
@@ -32,12 +40,14 @@ Có thể mở thẳng `codebase/index.html` bằng trình duyệt (file://) —
 Hành vi giống VLearn thật: **"Kiểm tra" = nộp câu**, đáp án bị khoá; gợi ý trước khi nộp mặc định ẩn.
 
 1. **Hồ sơ**: chọn *Non-IT* (ngoài đời xác định qua câu tự đánh giá lúc onboarding; người dùng luôn tự đổi được nếu chưa chắc).
-2. **Nộp câu trả lời**: bấm pill **7** (`Q07 · Temperature`), bấm *Xem gợi ý* (gợi ý AI sinh sẵn theo hồ sơ, không tốn lời gọi), chọn **A** (sai) → *Kiểm tra*.
-3. **Học từ lỗi**: đáp án khoá, B hiện xanh. Bậc 1: *giả định sai* + *gợi ý* (chưa giải thích) → bấm *Xem giải thích đầy đủ* → giải thích Non-IT + trích dẫn `[T04-072]`. Bấm *So sánh với hồ sơ khác*: cùng đáp án, khác lời giảng. Bấm **👎 → "Không đúng trình độ của tôi" → Gửi** để cho thấy hệ thống thu phản hồi.
-4. **Chỗ khó**: ô *Hỏi thêm* gõ `deadline nộp lab là khi nào?` → từ chối an toàn (③). Pill **16** (`Vector Database`) → giải thích **không có trích dẫn** và nói rõ vì sao (①). Hồ sơ *Chưa rõ* → hệ thống hỏi lại thay vì đoán (②).
+2. **Nộp câu trả lời**: bấm pill **7** (`Q07 · temperature`), chọn **C** (sai; đáp án đúng là A) → *Kiểm tra*. Các câu multi-select như Q01/Q17 cho phép chọn nhiều phương án; các câu mapping/ordering đã được chuyển thành các bộ đáp án hoàn chỉnh để chọn một phương án.
+3. **Học từ lỗi**: đáp án khoá, đáp án đúng hiện xanh; chẩn đoán, gợi ý và explanation cá nhân hóa xuất hiện cùng lúc trong một khối duy nhất. Bộ câu hỏi hiện chưa có transcript anchor đã xác minh nên UI hiển thị **chưa có trích dẫn** thay vì bịa mã nguồn. Bấm *So sánh với hồ sơ khác*: cùng đáp án, khác lời giảng. Bấm **👎 → "Không đúng trình độ của tôi" → Gửi** để cho thấy hệ thống thu phản hồi.
+4. **Chỗ khó**: ô *Hỏi thêm* gõ `deadline nộp lab là khi nào?` → từ chối an toàn (③). Pill **16** (`AI system design`) → chọn một bộ mapping hoàn chỉnh và xem fallback no-source. Hồ sơ *Chưa rõ* → hệ thống hỏi lại thay vì đoán (②).
 5. Mở **Trace** → prompt + phản hồi thô + độ trễ + phản hồi học viên gắn theo từng lời gọi.
 
-## Sinh gợi ý trước-khi-nộp (một lần)
+## Gợi ý trước-khi-nộp
+
+Ở chế độ local, Qwen 7B bắt đầu sinh gợi ý ngay khi người dùng vào một câu hỏi và lưu cache trong phiên trình duyệt. Nếu mở **Xem gợi ý** khi request chưa xong, UI hiển thị trạng thái chờ rồi tự thay bằng kết quả. Mentor tạo ba request theo ba persona. Script dưới đây chỉ còn là lựa chọn batch/fallback:
 
 ```bash
 node codebase/server/scripts/generate-hints.js --only Q07   # thử
@@ -48,6 +58,6 @@ Chưa chạy → nút "Xem gợi ý" hiện thông báo "chưa chạy sinh gợi
 ## Phần nào thật, phần nào mock (ghi vào spec §4)
 
 - **Thật (đã chạy):** luồng nộp → bậc 1 → bậc 2 → giải thích lại bằng lời mình; log sự kiện mở gợi ý / mở giải thích đầy đủ (`logs/events.jsonl`); gợi ý sinh sẵn; panel trace; log server (`logs/*.jsonl`, `logs/feedback.jsonl`); kiểm tra citation ∉ anchors; chỉ số học trong phiên; thu phản hồi 👍/👎 + lý do.
-- **Chờ AI Engineer:** `callModel()` trong `server/model.js` — lời gọi model thật (dùng cho cả `/api/explain` và script sinh gợi ý). Trước đó, badge trên UI luôn hiện **MOCK** (không được quay video CP3 ở chế độ này).
-- **Bản nháp cần review:** `concept` (Kiến thức đang luyện) của 20 câu trong `js/data.questions.js` (`draft: true`).
+- **LIVE:** `callModel()` trong `server/model.js` hỗ trợ OpenRouter và Ollama; `mock` chỉ dành cho smoke/offline test. UI hiển thị LIVE/MOCK riêng biệt.
+- **Nguồn:** 20 câu giữ nội dung AI track; anchors để rỗng có chủ ý khi chưa có transcript mapping đã xác minh.
 - **Mock có chủ ý (không làm trong hackathon):** đọc CV để suy persona; dashboard giảng viên; lưu lịch sử lỗi giữa các phiên.
