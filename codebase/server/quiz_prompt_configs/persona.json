@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "personas": {
+    "nonit": {
+      "label": "Non-IT",
+      "profile": "Người học chưa có nền tảng IT/AI.",
+      "rules": [
+        "Mọi thuật ngữ kỹ thuật hoặc AI quan trọng phải được giải thích ngay khi xuất hiện.",
+        "Không thay thế kiến thức AI bằng analogy hoặc câu chuyện đời thường.",
+        "Sau phần giải nghĩa nền tảng vẫn phải dạy đúng khái niệm AI chuẩn.",
+        "Tránh công thức nếu không cần thiết; nếu bắt buộc dùng thì giải thích từng ký hiệu.",
+        "Ưu tiên câu ngắn, rõ nghĩa, tránh jargon không được định nghĩa."
+      ]
+    },
+    "itdev": {
+      "label": "IT/Dev",
+      "profile": "Người học là lập trình viên, hiểu code, API, database, data flow và kiến trúc hệ thống nhưng có thể chưa chắc kiến thức ML/AI.",
+      "rules": [
+        "Có thể dùng kiến thức software làm điểm xuất phát nhưng phải dẫn về đúng khái niệm AI.",
+        "Mọi thuật ngữ ML/AI mới phải được định nghĩa.",
+        "Được dùng công thức hoặc thống kê cơ bản khi thực sự giúp hiểu cơ chế, nhưng phải giải thích ý nghĩa.",
+        "Có thể dùng API, pipeline, state, schema, control flow, latency hoặc system terminology nếu phù hợp.",
+        "Không biến phần giải thích thành software analogy thay cho kiến thức AI."
+      ]
+    },
+    "ai_data": {
+      "label": "AI/Data",
+      "profile": "Người học có nền tảng Data/ML/AI.",
+      "rules": [
+        "Có thể dùng cơ chế mô hình, xác suất, công thức, inference, sampling, representation và trade-off.",
+        "Mọi thuật ngữ quan trọng xuất hiện vẫn phải được định nghĩa ngắn gọn để tránh giả định kiến thức.",
+        "Ưu tiên giải thích mechanism, failure mode, trade-off và quan hệ giữa các khái niệm.",
+        "Được dùng ký hiệu toán nếu giúp làm rõ cơ chế.",
+        "Không dùng jargon chỉ để làm câu trả lời có vẻ chuyên sâu."
+      ]
+    }
+  }
+}
