@@ -1,14 +1,14 @@
-# Kết quả lượt 1 — golden set 20 case
+# Kết quả iteration hiện tại — golden set 20 case
 
-> **CHƯA CHẠY.** Điền sau khi server LIVE hoạt động. Không sửa số sau khi đã ghi; lượt sau ghi file `run-02-results.md`.
+> Đây là bảng tổng hợp iteration hiện tại do nhóm cung cấp. Bảng chi tiết từng case và log raw cần bổ sung để người chấm kiểm tra lại từng kết quả.
 
 | Trường | Giá trị |
 |---|---|
-| Ngày giờ chạy | |
-| Provider / model | |
-| Phiên bản prompt (commit) | |
-| Người chấm 1 / Người chấm 2 | |
-| Log thô | `codebase/server/logs/____.jsonl` · trace UI: `eval/trace-____.jsonl` |
+| Ngày giờ chạy | Chưa cung cấp |
+| Provider / model | Chưa cung cấp trong bảng kết quả |
+| Phiên bản prompt (commit) | Chưa cung cấp |
+| Người chấm 1 / Người chấm 2 | Chưa chấm chéo |
+| Log thô | Chưa đính kèm; cần thêm log đã loại dữ liệu bí mật |
 
 ## Bảng kết quả từng case
 
@@ -41,20 +41,28 @@ Ký hiệu: ✔ đạt · ✘ trượt · – không áp dụng cho case này.
 
 | Chỉ số | Số case áp dụng | Đạt | % |
 |---|---|---|---|
-| Persona fit | | | |
-| Diagnosis | | | |
-| Grounded / fallback đúng | | | |
-| Safe (② + ③) | | | |
-| **Đạt toàn case** | 20 | | |
-| Case lớp ③ từ chối an toàn | 3 | | (quality bar yêu cầu 100%) |
+| Hint no-leak | 20 | 20 | 100% |
+| Persona fit | 20 | 16 | 80% |
+| Grounded / fallback đúng | 20 | 20 | 100% |
+| Safety | 20 | 20 | 100% |
+| **Đạt toàn case** | 20 | 16 | 80% |
 
-Đối chiếu quality bar đã chốt trong `spec.md §7`: **ĐẠT / CHƯA ĐẠT** — …
+## Đối chiếu quality bar
+
+| Tiêu chí | Kết quả | Ngưỡng | Trạng thái |
+|---|---:|---:|---|
+| Pass toàn case | 16/20 | ≥16/20 | Đạt |
+| Persona fit | 16/20 | ≥17/20 | Chưa đạt |
+| Grounding | 20/20 | ≥18/20 | Đạt |
+| Safety | 20/20 | 20/20 | Đạt |
+
+**Kết luận iteration:** Chưa đạt toàn bộ quality bar vì Persona fit còn 1 case dưới ngưỡng.
 
 ## Phân tích từng case trượt
 
 Mỗi case trượt một mục: *hiện tượng → nguyên nhân giả định (prompt / anchor thiếu / model / định nghĩa) → sẽ sửa gì ở lượt 2*.
 
-- GS-__ : …
+- Chưa có bảng mapping kết quả theo từng GS; không tự suy đoán case trượt từ số tổng hợp.
 
 ## Độ lệch giữa hai người chấm
 

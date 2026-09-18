@@ -131,20 +131,24 @@ Loại: [x] Tính năng mới
   - Ngân hàng 20 câu + lời giải mẫu 3 persona + mã đoạn transcript được phép trích dẫn: `codebase/js/data.questions.js` (Q16, Q19 không có transcript tương ứng — dùng làm case lớp ①).
 
 - Quality bar (chốt tại CP4, giữ nguyên sau khi chạy):
-  - Một output được chấm theo 5 chiều trên; điểm tổng hợp là trung bình các chiều trên toàn bộ gold set.
-  - Đạt khi điểm trung bình tổng hợp từ gold set >= 75%, grounded/fallback đúng >= 90% và safety/schema/out-of-scope đạt 100%.
+  - **Pass toàn case:** ≥16/20.
+  - **Persona fit:** ≥17/20.
+  - **Grounding:** ≥18/20.
+  - **Safety:** 20/20 (100%).
+  - Các ngưỡng được đánh giá riêng trên cùng một golden set 20 case; một iteration chỉ đạt quality bar khi đủ tất cả ngưỡng.
   - LLM judge chỉ là bộ chấm tự động: so sánh output sinh ra với `expected`/đáp án chuẩn trong gold set theo rubric; chưa thay thế chấm thủ công.
 
 - Kết quả các lượt chạy (LLM judge, sơ bộ; chưa có human validation):
   - Baseline: **55%** điểm trung bình so với gold set.
-  - Current: **87%** điểm trung bình so với gold set sau khi cải thiện prompt/model/pipeline.
-  - Hai con số trên là kết quả tự động từ LLM judge; nhóm chưa chấm thủ công nên chưa được xem là kết quả xác nhận cuối cùng. Cần lưu report đầy đủ theo từng case, từng chiều và phân tích case trượt trong `eval/run-01-results.md`.
+  - Iteration hiện tại: **Pass toàn case 16/20**, **Persona fit 16/20**, **Grounding/fallback 20/20**, **Safety 20/20**, **Hint no-leak 20/20**.
+  - Đối chiếu quality bar: pass toàn case đạt ngưỡng; grounding và safety đạt; persona fit **chưa đạt** (16/20 < 17/20).
+  - Đây là kết quả tự động/iteration do nhóm cung cấp, chưa thay thế chấm thủ công. Cần lưu report đầy đủ theo từng case, từng chiều và phân tích case trượt trong `eval/run-01-results.md`.
 
 | Lần chạy | Số case | Profile alignment | Recovery rate | Grounded/fallback đúng | Ghi chú |
 |---|---:|---:|---:|---:|---|
 | Baseline | 20 | TBD | TBD | TBD | Chưa có phân nhóm profile, dùng feedback chung |
 | Iteration 1 | 20 | TBD | TBD | TBD | Thêm profile mapping + personalized hint ladder |
-| Iteration 2 | 20 | TBD | TBD | TBD | Tinh chỉnh prompt theo 3 nhóm và fallback low-confidence |
+| Iteration hiện tại | 20 | 16/20 | TBD | 20/20 | Pass toàn case 16/20; Persona fit 16/20; Hint no-leak 20/20; Safety 20/20 |
 
 ## §8. Phân công & kế hoạch
 - Phân công có tên:
@@ -174,4 +178,4 @@ Loại: [x] Tính năng mới
 | 18/09/2026 | Khoá đáp án sau "Kiểm tra" (bỏ "Tôi tự sửa → chọn lại"); pill 1–20 + progress; gợi ý trước-nộp ẩn mặc định, sinh sẵn bằng AI batch; sidebar Tiến độ + Kiến thức đang luyện | Đối chiếu giao diện VLearn thật (ảnh teamlead gửi): nút Kiểm tra là nộp câu; tiết kiệm token so với gọi AI mỗi lần bấm gợi ý |
 | 18/09/2026 | Thêm phản hồi học viên 👍/👎 + 4 lý do trên từng khối AI, lưu `feedback.jsonl` + trace | Cần dữ liệu "AI có phù hợp với trình độ không" từ người dùng thật cho CP5, đối chiếu được với prompt/response |
 | 18/09/2026 | Chuyển pipeline production sang Ollama local với Qwen 2.5 7B; hint được prefetch khi vào câu; diagnose trả nhận định + hint + explanation trong một khối | Bỏ phụ thuộc API cloud, giảm nhầm lẫn giữa luồng hai bậc cũ và flow demo hiện tại |
-| 18/09/2026 | Bổ sung đánh giá LLM judge trên gold set: baseline 55%, current 87% | Đo cải thiện tự động trước khi thực hiện vòng chấm thủ công của thành viên nhóm |
+| 18/09/2026 | Bổ sung đánh giá LLM judge trên gold set: baseline 55%; iteration hiện tại pass toàn case 16/20, Persona fit 16/20, Grounding/fallback 20/20, Safety 20/20, Hint no-leak 20/20 | Đối chiếu trực tiếp với quality bar đã chốt; Persona fit còn thiếu 1 case để đạt ngưỡng |

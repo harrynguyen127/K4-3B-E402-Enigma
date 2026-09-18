@@ -53,7 +53,7 @@ Mỗi lần học viên bấm 👍/👎 (+ lý do) trên một khối AI, server
 
 ## Việc cần chốt (không tự quyết được — cần nhóm)
 
-1. **Quality bar** (chốt tại CP4, trước 21:00 18/9, không đổi sau đó). Spec §7 hiện ghi 75% / 70% / 90% / 100% cho 4 chiều — nhưng "Learning recovery rate 70%" cần dữ liệu người thật, không đo được bằng golden set. Đề xuất viết lại thành 2 vế: *(a) trên golden set:* "≥ 80% case đạt Persona fit + Diagnosis, ≥ 90% Grounded/fallback đúng, 100% case ③ từ chối an toàn"; *(b) trên người thật (≥ 5 bạn, track D bắt buộc):* "≥ 60% sửa đúng sau bậc 1". Nhóm quyết con số.
+1. **Quality bar đã chốt**: trên golden set 20 case, Pass toàn case ≥16/20; Persona fit ≥17/20; Grounding ≥18/20; Safety 20/20 (100%). Một iteration chỉ đạt khi đủ tất cả ngưỡng. Hint no-leak được báo cáo riêng.
 2. **GS-19:** trả lời bằng tiếng Anh theo học viên hay giữ tiếng Việt?
 3. **Case "cho đáp án luôn" (spec §5 E6):** đã bỏ khỏi bộ 20 vì chưa chốt hành vi — từ chối hẳn hay cho thêm 1 gợi ý? (Ảnh hưởng prompt điều 6.) Chốt xong thì thêm lại ở lượt 2 nếu cần.
 4. **Q16, Q19 không có transcript**; Q02/Q09/Q15 chỉ có anchor "partial". Giữ các câu này trong demo (để test lớp ①) hay bỏ khỏi bộ đề để tránh giám khảo hỏi "sao không trích dẫn"? Đề xuất: giữ, và nói rõ đây là chủ ý.
