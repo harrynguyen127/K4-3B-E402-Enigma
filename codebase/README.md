@@ -31,12 +31,11 @@ Có thể mở thẳng `codebase/index.html` bằng trình duyệt (file://) —
 
 Hành vi giống VLearn thật: **"Kiểm tra" = nộp câu**, đáp án bị khoá; gợi ý trước khi nộp mặc định ẩn.
 
-1. **Hồ sơ**: chọn *Non-IT*.
+1. **Hồ sơ**: chọn *Non-IT* (ngoài đời xác định qua câu tự đánh giá lúc onboarding; người dùng luôn tự đổi được nếu chưa chắc).
 2. **Nộp câu trả lời**: bấm pill **7** (`Q07 · Temperature`), bấm *Xem gợi ý* (gợi ý AI sinh sẵn theo hồ sơ, không tốn lời gọi), chọn **A** (sai) → *Kiểm tra*.
 3. **Học từ lỗi**: đáp án khoá, B hiện xanh. Bậc 1: *giả định sai* + *gợi ý* (chưa giải thích) → bấm *Xem giải thích đầy đủ* → giải thích Non-IT + trích dẫn `[T04-072]`. Bấm *So sánh với hồ sơ khác*: cùng đáp án, khác lời giảng. Bấm **👎 → "Không đúng trình độ của tôi" → Gửi** để cho thấy hệ thống thu phản hồi.
-4. **Làm lại**: *Làm câu tương tự* → câu AI sinh theo hồ sơ → đúng → chỉ số "Đúng câu làm lại sau khi sai" tăng.
-5. **Chỗ khó**: ô *Hỏi thêm* gõ `deadline nộp lab là khi nào?` → từ chối an toàn (③). Pill **16** (`Vector Database`) → giải thích **không có trích dẫn** và nói rõ vì sao (①). Hồ sơ *Chưa rõ* → hệ thống hỏi lại thay vì đoán (②).
-6. Mở **Trace** → prompt + phản hồi thô + độ trễ + phản hồi học viên gắn theo từng lời gọi.
+4. **Chỗ khó**: ô *Hỏi thêm* gõ `deadline nộp lab là khi nào?` → từ chối an toàn (③). Pill **16** (`Vector Database`) → giải thích **không có trích dẫn** và nói rõ vì sao (①). Hồ sơ *Chưa rõ* → hệ thống hỏi lại thay vì đoán (②).
+5. Mở **Trace** → prompt + phản hồi thô + độ trễ + phản hồi học viên gắn theo từng lời gọi.
 
 ## Sinh gợi ý trước-khi-nộp (một lần)
 
@@ -48,7 +47,7 @@ Chưa chạy → nút "Xem gợi ý" hiện thông báo "chưa chạy sinh gợi
 
 ## Phần nào thật, phần nào mock (ghi vào spec §4)
 
-- **Thật (đã chạy):** luồng nộp → bậc 1 → bậc 2 → làm lại; gợi ý sinh sẵn; panel trace; log server (`logs/*.jsonl`, `logs/feedback.jsonl`); kiểm tra citation ∉ anchors; chỉ số học trong phiên; thu phản hồi 👍/👎 + lý do.
+- **Thật (đã chạy):** luồng nộp → bậc 1 → bậc 2 → giải thích lại bằng lời mình; log sự kiện mở gợi ý / mở giải thích đầy đủ (`logs/events.jsonl`); gợi ý sinh sẵn; panel trace; log server (`logs/*.jsonl`, `logs/feedback.jsonl`); kiểm tra citation ∉ anchors; chỉ số học trong phiên; thu phản hồi 👍/👎 + lý do.
 - **Chờ AI Engineer:** `callModel()` trong `server/model.js` — lời gọi model thật (dùng cho cả `/api/explain` và script sinh gợi ý). Trước đó, badge trên UI luôn hiện **MOCK** (không được quay video CP3 ở chế độ này).
 - **Bản nháp cần review:** `concept` (Kiến thức đang luyện) của 20 câu trong `js/data.questions.js` (`draft: true`).
 - **Mock có chủ ý (không làm trong hackathon):** đọc CV để suy persona; dashboard giảng viên; lưu lịch sử lỗi giữa các phiên.

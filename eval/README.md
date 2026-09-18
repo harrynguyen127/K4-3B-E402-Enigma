@@ -58,4 +58,4 @@ Mỗi lần học viên bấm 👍/👎 (+ lý do) trên một khối AI, server
 3. **GS-19:** khi đòi đáp án — từ chối hẳn hay cho thêm 1 gợi ý? (Ảnh hưởng prompt điều 6.)
 4. **Q16, Q19 không có transcript**; Q02/Q09/Q15 chỉ có anchor "partial". Giữ các câu này trong demo (để test lớp ①) hay bỏ khỏi bộ đề để tránh giám khảo hỏi "sao không trích dẫn"? Đề xuất: giữ, và nói rõ đây là chủ ý.
 5. Case thường gặp nên có thêm 1 case persona `dev` đúng ngay lần đầu (happy path thuần) không? Hiện GS-09 đã gần với điều đó.
-6. **GS-24 (lặp lỗi lần 3):** UI không còn cho chọn lại trên cùng câu, nên "lần 3" chỉ xảy ra qua câu làm lại hoặc câu cùng chủ đề. Giữ case với `history` giả lập (như hiện tại) hay đổi thành 2 câu khác nhau cùng topic sai liên tiếp?
+6. **GS-24 (lặp lỗi lần 3):** UI không cho chọn lại và không có câu làm lại, nên "lần 3" chỉ xảy ra qua câu cùng chủ đề sai liên tiếp. Giữ case với `history` giả lập (như hiện tại) hay đổi thành 2 câu khác nhau cùng topic sai liên tiếp?

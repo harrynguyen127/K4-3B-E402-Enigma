@@ -60,8 +60,7 @@
         "must": [
           "misconception: học viên coi 1 từ = 1 token",
           "explanation theo hướng tokenizer encode string → token IDs (góc nhìn dev)",
-          "citation.code ∈ {T04-049, T06-134, T06-135}",
-          "retry_question cùng chủ đề tokenization, bối cảnh code/API"
+          "citation.code ∈ {T04-049, T06-134, T06-135}"
         ],
         "must_not": ["mã đoạn ngoài anchors"]
       }
@@ -280,7 +279,7 @@
       "request": { "mode": "diagnose", "persona": "nonit", "question_id": "Q08", "learner_answer": "D", "attempt": 1 },
       "expected": {
         "verdict": "incorrect",
-        "must": ["explanation là ẩn dụ đọc hiểu (chú ý từ liên quan trong câu)", "citation T06-086 hoặc T06-130", "retry_question không dùng thuật ngữ Q/K/V"],
+        "must": ["explanation là ẩn dụ đọc hiểu (chú ý từ liên quan trong câu)", "citation T06-086 hoặc T06-130"],
         "must_not": ["softmax", "dot-product", "Query/Key/Value", "ký hiệu toán"]
       }
     },

@@ -8,6 +8,7 @@
  *   2. POST /api/explain : build prompt → callModel() (server/model.js) → parse
  *      JSON → trả { prompt, raw_response, parsed } cho UI ghi trace.
  *   3. POST /api/feedback : lưu đánh giá 👍/👎 của học viên → logs/feedback.jsonl.
+ *      POST /api/event    : sự kiện hành vi (mở gợi ý, mở giải thích đầy đủ) → logs/events.jsonl.
  *   4. Ghi log logs/YYYY-MM-DD.jsonl : request + prompt + raw + parsed + latency.
  *
  * Lời gọi model nằm ở server/model.js (AI Engineer hoàn thiện callModel()).
@@ -89,6 +90,14 @@ const server = http.createServer(async (req, res) => {
       ui_mode: fb.ui_mode || null
     };
     appendLog("feedback.jsonl", entry);
+    return json(res, 200, { ok: true });
+  }
+
+  if (req.method === "POST" && req.url === "/api/event") {
+    let ev;
+    try { ev = JSON.parse(await readBody(req)); } catch (_) { return json(res, 400, { error: "Body không phải JSON" }); }
+    if (!ev.event || typeof ev.event !== "string") return json(res, 400, { error: "thiếu event" });
+    appendLog("events.jsonl", Object.assign({ ts: new Date().toISOString() }, ev));
     return json(res, 200, { ok: true });
   }
 

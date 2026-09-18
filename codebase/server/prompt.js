@@ -31,7 +31,6 @@ const SCHEMA = `{
   "explanation": string|null,
   "citation": {"code":string,"quote":string,"confidence":"strong|partial"}|null,
   "no_source_note": string|null,
-  "retry_question": {"stem":string,"options":{"A":string,"B":string,"C":string,"D":string},"correct":"A|B|C|D"}|null,
   "followup_answer": string|null,
   "probe_result": "understood|needs_more"|null,
   "safety": {"refused":boolean,"reason":"out_of_scope|prompt_injection|asks_answer_directly"|null}
@@ -81,7 +80,7 @@ Nếu nằm trong phạm vi kiến thức của câu hỏi → trả lời ngắ
     task = `NHIỆM VỤ: học viên vừa trả lời đúng và giải thích lại bằng lời của mình: """${req.learner_explanation || ""}"""
 Đối chiếu với lý do đúng của đáp án ${q.correct}. Nếu lời giải thích nêu được ý cốt lõi → probe_result = "understood" và khen ngắn gọn; nếu thiếu/nhầm → probe_result = "needs_more" và đặt MỘT câu hỏi ngược đúng chỗ hổng (followup_answer). Không giảng lại toàn bộ.`;
   } else {
-    task = `NHIỆM VỤ: chẩn đoán lỗi và giải thích theo persona. Nếu học viên sai, thêm retry_question: một câu trắc nghiệm mới cùng khái niệm "${q.topic}" nhưng đổi bối cảnh cho phù hợp persona, 4 phương án, chỉ 1 đúng.`;
+    task = `NHIỆM VỤ: chẩn đoán lỗi và giải thích theo persona (misconception → hint → explanation). Không sinh thêm câu hỏi mới.`;
   }
 
   const user = `HỒ SƠ HỌC VIÊN (persona = ${req.persona}): ${personaStyle}
@@ -105,4 +104,4 @@ ${SCHEMA}`;
   return { system: SYSTEM, user };
 }
 
-module.exports = { buildPrompt, buildHintPrompt, SYSTEM, SCHEMA, PROMPT_VERSION: "0.2" };
+module.exports = { buildPrompt, buildHintPrompt, SYSTEM, SCHEMA, PROMPT_VERSION: "0.3" };

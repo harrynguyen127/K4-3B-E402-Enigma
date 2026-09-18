@@ -8,7 +8,7 @@
 
 | Họ và Tên | Mã Học Viên | Vai trò chính | Phần việc đảm nhiệm trong dự án |
 |---|---|---|---|
-| Nguyễn Anh Tuấn | 2A202602700 | Teamlead | Điều phối dự án, phân chia công việc, tạo UI |
+| Nguyễn Anh Tuấn | 2A202602700 | Teamlead | Điều phối dự án, phân chia công việc, tạo Flow, Prototype, Backend, UXUI |
 | Đặng Quang Hưng | 2A202602719 | Member | Mining evidence, lập evidence table và chọn 5 turn_id minh họa |
 | Nguyễn Hữu Thành | 2A202602813 | Member | AI Engineer | Track AI và dữ liệu |
 | Hà Thị Mỹ Linh | 2A202602619 | BA  | Track chính về tìm hiểu thị trường |
