@@ -304,12 +304,10 @@
       const correct = ai.verdict === "correct";
       pieces.push(`<div class="banner ${correct ? "ok" : "bad"}">${correct ? "✔ Chính xác." : "✘ Chưa đúng."} Mentor đang so sánh cùng một đáp án qua ba cách giải thích.</div>`);
       pieces.push(`<div class="card pad stack"><div class="ai-block">${aiHeader("Mentor · So sánh cả 3 hồ sơ", "3 hồ sơ · một lần kiểm tra", ai, "mentor")}
-        <div class="small">Gợi ý và lời giải được hiển thị cùng lúc; đáp án đúng và kiến thức cốt lõi không thay đổi giữa các hồ sơ.</div>
+        <div class="small">Lời giải của ba hồ sơ được hiển thị cùng lúc; đáp án đúng và kiến thức cốt lõi không thay đổi giữa các hồ sơ.</div>
         <div class="compare-grid">${ai._compare_outputs.map(row => {
           const out = row.output;
-          return `<div class="ai-block">${aiHeader(P[row.persona].name, "gợi ý + giải thích", out, row.persona)}
-            ${!correct ? `<div><b>Nhận định lỗi:</b> ${esc(out.misconception || "Chưa có chẩn đoán riêng.")}</div>` : ""}
-            <div><b>Gợi ý:</b> ${esc(out.hint || (correct ? "Bạn đã chọn đúng; không cần gợi ý sửa sai." : "AI không trả về gợi ý."))}</div>
+          return `<div class="ai-block">${aiHeader(P[row.persona].name, "giải thích", out, row.persona)}
             <div><b>Giải thích:</b> ${esc(out.explanation || "AI không trả về lời giải.")}</div>
             ${citeHtml(out)}
             ${fbHtml(`compare-${row.persona}`)}
@@ -339,9 +337,7 @@
     const correct = ai.verdict === "correct";
     pieces.push(`<div class="banner ${correct ? "ok" : "bad"}">${correct ? "✔ Chính xác. Câu trả lời đã được ghi nhận." : "✘ Chưa đúng — câu trả lời đã được ghi nhận. Xem giải thích cá nhân hóa bên dưới."}</div>`);
 
-    pieces.push(`<div class="card pad stack"><div class="ai-block">${aiHeader("Giải thích — góc nhìn " + personaName(), "hint + explanation", ai)}
-      ${!correct ? `<div><b>Nhận định lỗi:</b> ${esc(ai.misconception || "(AI không trả về)")}</div>
-      <div><b>Gợi ý:</b> ${esc(ai.hint || "(AI không trả về)")}</div>` : ""}
+    pieces.push(`<div class="card pad stack"><div class="ai-block">${aiHeader("Giải thích — góc nhìn " + personaName(), "explanation", ai)}
       <div><b>Giải thích:</b> ${esc(ai.explanation || "(AI không trả về)")}</div>
       ${citeHtml(ai)}
       <div class="small">Đáp án đúng: <b>${cur.correct}</b> — giống nhau cho mọi hồ sơ; chỉ cách giải thích thay đổi. <a href="#" id="lnk-compare">So sánh với hồ sơ khác</a></div>
