@@ -161,7 +161,7 @@ Loại: [x] Tính năng mới
   - Nguyễn Hoàng Cường - Học viên profile Data/AI
   - Văn Thành Huy - Học viên profile IT/Dev
   - Nguyễn Tiến Phát - Học viên profile Non-IT
-  - Kế hoạch vòng validation: cho mỗi bạn làm 1 mini-flow 3 câu (1 câu sai để test hint, 1 câu sửa sau hint, 1 câu survey để đánh giá độ phù hợp profile), log thời gian và mức độ hiểu.
+  - Kế hoạch và kết quả vòng validation: đã thực hiện đo kiểm thực tế trên 3 bạn ngoài nhóm phủ trọn 3 persona (Đinh Thị Minh Tâm - Data/AI, Nguyễn Khánh Linh - Non-IT, Nguyễn Viết Đức - IT/Dev) theo chuẩn 4.2. Bảng log chi tiết và 4 dòng tổng hợp xem tại [`validation/user-validation.md`](validation/user-validation.md). Kết quả: 100% đánh giá ý tưởng trọn vẹn, giải thích dễ hiểu; phát hiện 3 điểm cải tiến đắt giá (độ phân loại câu hỏi code, loading spinner khi AI chấm, và phân loại partial correct).
 
 - Multi-prototype (nếu làm):
   - PA1: Rule-based profile-aware hint ladder.
@@ -179,3 +179,4 @@ Loại: [x] Tính năng mới
 | 18/09/2026 | Gắn mã đoạn transcript thật cho từng câu (`anchors`, `anchor_confidence`); phát hiện transcript **không có** đoạn về vector DB/embedding/chunking | Tránh AI bịa trích dẫn (lớp ①): chỉ được trích trong danh sách anchors, không có thì nói rõ |
 | 18/09/2026 | Khoá đáp án sau "Kiểm tra" (bỏ "Tôi tự sửa → chọn lại"); pill 1–20 + progress; gợi ý trước-nộp ẩn mặc định, sinh sẵn bằng AI batch; sidebar Tiến độ + Kiến thức đang luyện | Đối chiếu giao diện VLearn thật (ảnh teamlead gửi): nút Kiểm tra là nộp câu; tiết kiệm token so với gọi AI mỗi lần bấm gợi ý |
 | 18/09/2026 | Thêm phản hồi học viên 👍/👎 + 4 lý do trên từng khối AI, lưu `feedback.jsonl` + trace | Cần dữ liệu "AI có phù hợp với trình độ không" từ người dùng thật cho CP5, đối chiếu được với prompt/response |
+| 18/09/2026 | Bổ sung kết quả User Validation 3 bạn ngoài nhóm phủ 3 persona (`validation/user-validation.md`), đưa 3 cải tiến vào backlog/prototype (độ khó câu hỏi code, loading spinner, phân loại partial correct) | Phản hồi thực tế theo chuẩn 4.2 từ Minh Tâm (UI/UX), Khánh Linh (độ trễ AI & câu hỏi nhiều đáp án), Viết Đức (độ sâu kỹ thuật & roadmap) |
