@@ -12,6 +12,10 @@ Mở `http://localhost:8787`. UI mặc định gọi **Claude (Anthropic API)** 
 
 Trước mỗi lời giải, server tự tìm tối đa 3 đoạn trong transcript bằng retrieval local, hoàn toàn độc lập với persona. Có đoạn đủ liên quan thì phản hồi kèm mã `[Txx-NNN]`; không có thì model vẫn giải thích bằng kiến thức chung và hiển thị ghi chú rõ rằng không có nguồn buổi học phù hợp.
 
+## Data pack (không nằm trong repo)
+
+`data/vlearn-pack/` (chatlog + transcript) là dữ liệu BTC cấp riêng, **không được commit** vào repo công khai (`data/` đã gitignore). Retrieval transcript ([server/retrieval.js](server/retrieval.js)) cần bản cục bộ: đặt `TRANSCRIPT_DIR=<đường dẫn tới thư mục transcript>` trong `server/.env` (xem `.env.example`), hoặc chép data pack vào `data/vlearn-pack/`. Thiếu data thì server vẫn chạy nhưng retrieval tắt: log khởi động in `CẢNH BÁO`, `/api/health` báo `retrieval.available = false`, và mọi câu dùng fallback "không có nguồn" (citation = null). Khi chạy golden set phải có data pack, nếu không các case kỳ vọng citation sẽ trượt vì thiếu nguồn chứ không phải vì AI sai.
+
 ## Kết quả sinh sẵn (cache) — demo không gọi model lúc bấm "Kiểm tra"
 
 ```bash

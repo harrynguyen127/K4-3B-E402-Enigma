@@ -53,7 +53,6 @@
     history: [],            // [{question_id, answer, verdict}]
     tStart: null,
     submitted: {},          // qIndex -> "correct" | "incorrect"
-    tour: {},               // các mốc đã thử: explained | compare | followup_refused | unknown_asked | trace_opened
     feedback: {},           // block key -> {rating, reasons[], note, sent}
     stats: { checked: 0, wrong: 0, hint: 0, times: [], up: 0, down: 0 }
   };
@@ -217,29 +216,32 @@
   /* ---------- feedback học viên ---------- */
   function fbHtml(key) {
     const f = state.feedback[key] || {};
-    if (f.sent) return `<div class="fb"><span class="thanks">✔ Cảm ơn, đã ghi nhận phản hồi của bạn${f.stored === "server+trace" ? " (đã lưu server)" : ""}.</span></div>`;
+    const thanks = f.sent ? `<span class="thanks">✔ Đã ghi nhận${f.stored === "server+trace" ? " (đã lưu server)" : ""}.</span>` : "";
     return `<div class="fb" data-key="${key}">
       <div class="fb-row"><span>Phản hồi này có phù hợp với bạn?</span>
         <button class="fb-btn ${f.rating === "up" ? "on-up" : ""}" data-r="up">👍</button>
         <button class="fb-btn ${f.rating === "down" ? "on-down" : ""}" data-r="down">👎</button>
-        ${f.rating === "up" ? `<button class="btn sm primary" data-send="1">Gửi</button>` : ""}
+        ${thanks}
       </div>
-      ${f.rating === "down" ? `<div class="chips">${FB_REASONS.map(([k, l]) => `<button class="chip ${(f.reasons || []).includes(k) ? "on" : ""}" data-c="${k}">${l}</button>`).join("")}</div>
-        <div class="fb-row"><input type="text" data-note="1" placeholder="Ghi chú thêm (tuỳ chọn)" value="${esc(f.note || "")}"><button class="btn sm primary" data-send="1">Gửi</button></div>` : ""}
     </div>`;
   }
   function wireFeedback(root, meta) {
     root.querySelectorAll(".fb[data-key]").forEach(box => {
       const key = box.dataset.key; const f = state.feedback[key] = state.feedback[key] || { reasons: [] };
-      box.querySelectorAll(".fb-btn").forEach(b => b.onclick = () => { f.rating = b.dataset.r; render(); });
-      box.querySelectorAll(".chip").forEach(b => b.onclick = () => { const k = b.dataset.c; f.reasons = f.reasons.includes(k) ? f.reasons.filter(x => x !== k) : f.reasons.concat(k); render(); });
-      const note = box.querySelector("input[data-note]"); if (note) note.oninput = () => { f.note = note.value; };
-      const send = box.querySelector("[data-send]"); if (send) send.onclick = async () => {
+      box.querySelectorAll(".fb-btn").forEach(b => b.onclick = async () => {
+        if (f.sending) return;
+        f.sending = true;
+        const prev = f.sent ? f.rating : null;
+        const next = prev === b.dataset.r ? null : b.dataset.r;  // bấm lại nút đang chọn → bỏ chọn
         const m = meta(key);
-        const r = await window.AI.sendFeedback({ trace_id: m.trace_id, question_id: q().id, persona: m.persona || state.persona, mode: m.mode, block: m.block, rating: f.rating, reasons: f.reasons, note: f.note || "" });
-        f.sent = true; f.stored = r.stored; if (f.rating === "up") state.stats.up++; else state.stats.down++;
+        try {
+          const r = await window.AI.sendFeedback({ trace_id: m.trace_id, question_id: q().id, persona: m.persona || state.persona, mode: m.mode, block: m.block, rating: next || "none", reasons: f.reasons, note: f.note || "" });
+          f.rating = next; f.sent = Boolean(next); f.stored = r.stored;
+          if (prev) state.stats[prev]--;
+          if (next) state.stats[next]++;
+        } finally { f.sending = false; }
         render();
-      };
+      });
     });
   }
 
@@ -323,13 +325,11 @@
       <div class="small">Đáp án đúng: <b>${cur.correct}</b> — giống nhau cho mọi hồ sơ; chỉ cách giải thích thay đổi. <a href="#" id="lnk-compare">So sánh với hồ sơ khác</a></div>
       ${generationMetaHtml(ai)}
       <div id="compare-out"></div>
-      ${correct ? `<div class="stack" style="margin-top:6px;"><div class="label">Giải thích lại bằng lời của bạn (kiểm tra hiểu thật, không đoán)</div><textarea id="probe-text" placeholder="Vì sao đáp án ${cur.correct} đúng và các phương án kia sai?"></textarea><div class="row"><button class="btn sm" id="btn-probe">Gửi cho AI kiểm tra</button><span id="probe-out" class="small"></span></div><div id="probe-fb"></div></div>` : ""}
       ${fbHtml("explanation")}
     </div></div>`);
     sec.innerHTML = pieces.join("");
     wireFeedback(sec, (key) => ({ trace_id: state.ai?._trace_id, mode: "diagnose", block: key }));
-    $("lnk-compare") && ($("lnk-compare").onclick = (e) => { e.preventDefault(); state.tour.compare = true; renderTour(); $("compare-out").innerHTML = ["nonit", "dev", "dataai"].filter(k => k !== state.persona).map(k => `<div class="ai-block" style="margin-top:8px;"><span class="tag" style="color:${pColor(k)}"><span class="dot" style="background:${pColor(k)}"></span>${P[k].name} (lời giải mẫu của nhóm)</span><div>${esc(cur.reference[k])}</div></div>`).join(""); });
-    $("btn-probe") && ($("btn-probe").onclick = runProbe);
+    $("lnk-compare") && ($("lnk-compare").onclick = (e) => { e.preventDefault(); $("compare-out").innerHTML = ["nonit", "dev", "dataai"].filter(k => k !== state.persona).map(k => `<div class="ai-block" style="margin-top:8px;"><span class="tag" style="color:${pColor(k)}"><span class="dot" style="background:${pColor(k)}"></span>${P[k].name} (lời giải mẫu của nhóm)</span><div>${esc(cur.reference[k])}</div></div>`).join(""); });
   }
 
   function recordTime() { if (state.tStart) { state.stats.times.push(Math.round((Date.now() - state.tStart) / 1000)); state.tStart = null; } }
@@ -357,8 +357,6 @@
         ai = await window.AI.explain(buildRequest("diagnose"));
       }
       state.ai = ai;
-      if (ai.needs_clarification) state.tour.unknown_asked = true;
-      else if (ai.verdict === "incorrect") state.tour.explained = true;
       if (!ai.needs_clarification) {
         if (!(state.qIndex in state.submitted)) {
           state.submitted[state.qIndex] = ai.verdict;
@@ -423,25 +421,12 @@
     render();
   }
 
-  async function runProbe() {
-    const txt = ($("probe-text").value || "").trim(); if (!txt) return;
-    $("probe-out").innerHTML = `<span class="loading"><i></i><i></i><i></i></span>`;
-    try {
-      const r = await window.AI.explain(buildRequest("probe", { learner_explanation: txt }));
-      $("probe-out").innerHTML = `<b>${r.probe_result === "understood" ? "✔ Đã hiểu" : "↺ Cần nói rõ hơn"}</b> — ${esc(r.followup_answer || "")}`;
-      state.feedback.probe = { reasons: [] }; $("probe-fb").innerHTML = fbHtml("probe");
-      wireFeedback($("probe-fb"), () => ({ trace_id: r._trace_id, mode: "probe", block: "probe" }));
-    } catch (e) { $("probe-out").innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`; }
-    renderTrace();
-  }
-
   async function runFollowup() {
     const txt = ($("followup-text").value || "").trim(); if (!txt) return;
     $("followup-out").innerHTML = `<div class="loading"><i></i><i></i><i></i></div>`;
     try {
       const r = await window.AI.explain(buildRequest("followup", { followup_text: txt }));
       const refused = r.safety && r.safety.refused;
-      if (refused) { state.tour.followup_refused = true; renderTour(); }
       state.feedback.followup = { reasons: [] };
       $("followup-out").innerHTML = `<div class="ai-block ${refused ? "refuse" : ""}">${aiHeader(refused ? "Ngoài phạm vi — từ chối an toàn" : "Trả lời theo góc nhìn " + personaName(), refused ? "③ " + esc(r.safety.reason || "") : "followup", r)}<div>${esc(r.followup_answer || "(AI không trả về)")}</div>${fbHtml("followup")}</div>`;
       wireFeedback($("followup-out"), () => ({ trace_id: r._trace_id, mode: "followup", block: "followup" }));
@@ -551,7 +536,7 @@
       renderProgress(done, total, question);
       await Promise.all(jobs); // 6 lời gọi song song cho mỗi câu, tuần tự giữa các câu để không dồn rate limit
     }
-    genBusy = false; state.tour.livegen = true; renderLiveGen(); renderTour(); renderQuiz();
+    genBusy = false; renderLiveGen(); renderQuiz();
   }
   function renderProgress(done, total, question) {
     const el = $("livegen-progress");
@@ -672,7 +657,7 @@
       <details class="tr">
         <summary><span class="chip ${e.error ? "err" : (e.mode || "").toLowerCase().replace(/\s+/g, "-")}">${e.error ? "LỖI" : traceSafe(e.mode)}</span>
           <span>${esc(e.request?.mode)} · ${esc(e.request?.question?.id)} · ${esc(e.request?.persona)} · chọn ${esc(e.request?.learner_answer ?? "—")}</span>
-          ${e.user_feedback ? `<span class="chip">${e.user_feedback.rating === "up" ? "👍" : "👎"}</span>` : ""}${e.events && e.events.length ? `<span class="chip">sự kiện</span>` : ""}
+          ${e.user_feedback ? `<span class="chip">${{ up: "👍", down: "👎" }[e.user_feedback.rating] || "—"}</span>` : ""}${e.events && e.events.length ? `<span class="chip">sự kiện</span>` : ""}
           <span class="small">${e.latency_ms != null ? e.latency_ms + " ms" : ""} · ${new Date(e.ts).toLocaleTimeString("vi-VN")}</span></summary>
         ${e.error ? `<pre>${esc(traceSafe(e.error))}</pre>` : ""}
         <div class="small" style="margin-top:8px;"><b>Prompt</b></div><pre>${esc(traceSafe(typeof e.prompt === "string" ? e.prompt : JSON.stringify(e.prompt, null, 2)))}</pre>
@@ -693,7 +678,7 @@
   function syncRadio() { document.querySelectorAll(".radio-row").forEach(r => r.classList.toggle("on", r.querySelector("input").checked)); }
 
   /* ---------- master render ---------- */
-  /* ---------- hướng dẫn theo bước + lộ trình thử ---------- */
+  /* ---------- hướng dẫn theo bước ---------- */
   const D2 = '<span class="tour-tag d2">D2</span>', BASE = '<span class="tour-tag">nền</span>';
   function guideContent() {
     if (state.step === 1) return { n: "1", d2: false, do: "Chọn hồ sơ học viên (Non-IT · IT/Dev · Data/AI).", see: "Đây là đầu vào của tính năng: cùng câu hỏi, lời giải thích sẽ đổi theo hồ sơ này. Chọn “Chưa rõ” để xem hệ thống hỏi lại thay vì đoán." };
@@ -708,25 +693,7 @@
     show(el, Boolean(g)); if (!g) return;
     el.innerHTML = `<div class="g-icon">${g.n}</div><div class="g-body"><div class="g-do">${g.do}</div><div class="g-see">${g.see}</div></div><div class="g-tag">${g.d2 ? D2 : BASE}</div>`;
   }
-  function tourItems() {
-    const wrongOnce = Object.values(state.submitted).includes("incorrect");
-    return [
-      { txt: "Chọn hồ sơ học viên", d2: false, done: Boolean(state.persona) && state.persona !== "unknown" },
-      { txt: "Nộp một câu trả lời sai (VD câu 7 chọn C)", d2: false, done: wrongOnce },
-      { txt: "Đọc chẩn đoán → gợi ý → giải thích theo hồ sơ", d2: true, done: Boolean(state.tour.explained) },
-      { txt: "So sánh với hồ sơ khác: cùng đáp án, khác cách giảng", d2: true, done: Boolean(state.tour.compare) },
-      { txt: "Hỏi thêm ngoài phạm vi → AI từ chối an toàn", d2: true, done: Boolean(state.tour.followup_refused) },
-      { txt: "Hồ sơ “Chưa rõ” → AI hỏi lại thay vì đoán", d2: true, done: Boolean(state.tour.unknown_asked) },
-      { txt: "Bấm “Sinh trực tiếp”: xem model thật sinh gợi ý + log token, chi phí", d2: true, done: Boolean(state.tour.livegen) },
-      { txt: "Mở Trace: prompt + phản hồi thô + độ trễ", d2: false, done: Boolean(state.tour.trace_opened) }
-    ];
-  }
-  function renderTour() {
-    const items = tourItems(); const firstOpen = items.findIndex(x => !x.done);
-    $("tour-list").innerHTML = items.map((x, i) => `<li class="${x.done ? "done" : ""}${i === firstOpen ? " now" : ""}"><span class="box">${x.done ? "✓" : ""}</span><span class="txt">${x.txt}${x.d2 ? D2 : ""}</span></li>`).join("");
-    $("tour-count").textContent = `${items.filter(x => x.done).length}/${items.length}`;
-  }
-  function render() { renderChrome(); renderPersona(); renderQuiz(); renderAI(); renderTrace(); renderGuide(); renderTour(); renderLiveGen(); }
+  function render() { renderChrome(); renderPersona(); renderQuiz(); renderAI(); renderTrace(); renderGuide(); renderLiveGen(); }
 
   /* ---------- wire ---------- */
   $("btn-check").addEventListener("click", () => { if (state.checked && state.ai && !state.ai.needs_clarification) nextQuestion(); else runDiagnose(); });
@@ -747,7 +714,7 @@
   $("btn-livegen-clear").addEventListener("click", () => { if (confirm("Xoá bảng log sinh trực tiếp?")) { genLog = []; genOpen = null; persistGenLog(); renderLiveGen(); } });
   $("btn-followup").addEventListener("click", runFollowup);
   $("followup-text").addEventListener("keydown", (e) => { if (e.key === "Enter") runFollowup(); });
-  $("btn-trace").addEventListener("click", () => { $("drawer").classList.toggle("open"); if ($("drawer").classList.contains("open")) { state.tour.trace_opened = true; renderTour(); } });
+  $("btn-trace").addEventListener("click", () => { $("drawer").classList.toggle("open"); });
   $("btn-close-drawer").addEventListener("click", () => $("drawer").classList.remove("open"));
   $("btn-export").addEventListener("click", () => window.Trace.exportJSONL());
   $("btn-clear").addEventListener("click", () => { if (confirm("Xoá toàn bộ trace trong trình duyệt?")) window.Trace.clear(); });

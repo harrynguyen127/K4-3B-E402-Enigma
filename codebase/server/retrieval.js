@@ -4,7 +4,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const TRANSCRIPT_DIR = process.env.TRANSCRIPT_DIR || path.resolve(__dirname, "..", "..", "data", "vlearn-pack", "transcript");
+// Data pack của BTC KHÔNG được commit vào repo (quy định bảo mật điều 3; data/ đã gitignore).
+// Trỏ tới bản cục bộ bằng TRANSCRIPT_DIR trong server/.env, hoặc đặt bản sao vào data/vlearn-pack/transcript.
+// Không có thư mục → retrieval tắt và mọi câu rơi về fallback "không có nguồn" (xem retrievalStatus()).
+const DEFAULT_TRANSCRIPT_DIR = path.resolve(__dirname, "..", "..", "data", "vlearn-pack", "transcript");
+const TRANSCRIPT_DIR = process.env.TRANSCRIPT_DIR ? path.resolve(process.env.TRANSCRIPT_DIR) : DEFAULT_TRANSCRIPT_DIR;
 const CHUNK_RE = /\*\*\[(T\d+-\d+)\]\*\*\s*(.+)$/gm;
 const STOP = new Set("các cái cho của có là và một những được trong khi với này đó từ vào về thì để hoặc nên nào gì như theo trên dưới tại bởi đang sẽ đã cũng hơn nhất đúng sai câu hỏi đáp án lựa chọn".split(/\s+/));
 let cache = null;
@@ -21,7 +25,8 @@ function normalizedPhrase(text) {
 function loadIndex() {
   if (cache) return cache;
   const chunks = [];
-  if (fs.existsSync(TRANSCRIPT_DIR)) {
+  const available = fs.existsSync(TRANSCRIPT_DIR);
+  if (available) {
     for (const file of fs.readdirSync(TRANSCRIPT_DIR).filter(x => /^transcript-.*-clean\.md$/.test(x)).sort()) {
       const content = fs.readFileSync(path.join(TRANSCRIPT_DIR, file), "utf8");
       for (const match of content.matchAll(CHUNK_RE)) {
@@ -33,7 +38,7 @@ function loadIndex() {
   const df = new Map();
   for (const chunk of chunks) for (const term of new Set(chunk.terms)) df.set(term, (df.get(term) || 0) + 1);
   const avgLength = chunks.length ? chunks.reduce((sum, c) => sum + c.terms.length, 0) / chunks.length : 0;
-  cache = { chunks, df, total: chunks.length, avgLength };
+  cache = { chunks, df, total: chunks.length, avgLength, available };
   return cache;
 }
 
@@ -100,7 +105,12 @@ function excerpt(text, queryTerms, maxLength = 1200) {
 
 function retrievalStatus() {
   const index = loadIndex();
-  return { transcript_dir: TRANSCRIPT_DIR, chunks: index.total };
+  return {
+    transcript_dir: TRANSCRIPT_DIR,
+    available: index.available,
+    chunks: index.total,
+    note: index.available ? null : "Không thấy data pack transcript (không nằm trong repo) — retrieval tắt, mọi câu dùng fallback không có nguồn. Đặt TRANSCRIPT_DIR trong server/.env."
+  };
 }
 
 module.exports = { retrieveAnchors, retrievalStatus };

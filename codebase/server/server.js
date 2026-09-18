@@ -301,4 +301,6 @@ function json(res, status, obj) {
 server.listen(PORT, () => {
   console.log(`Enigma D2 server → http://localhost:${PORT}`);
   console.log(`AI_PROVIDER = ${process.env.AI_PROVIDER || "(chưa cấu hình → /api/explain trả 501; UI dùng MOCK)"}`);
+  const rs = retrievalStatus();
+  console.log(rs.available ? `Retrieval: ${rs.chunks} đoạn transcript từ ${rs.transcript_dir}` : `CẢNH BÁO — ${rs.note}`);
 });

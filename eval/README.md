@@ -21,7 +21,7 @@
 | Hiếm | 2–4 | 2 | GS-19, GS-20 |
 | **Từ chatlog thật** | ≥ 10 | **15/20** | mọi case có `source: chatlog:T…` |
 
-Mã `T#####` trong `source` là `turn_id` trong `data/vlearn-pack/chatlog/tutor_turns.csv` (không dán nguyên văn dài vào repo theo luật data pack).
+Mã `T#####` trong `source` là `turn_id` trong `data/vlearn-pack/chatlog/tutor_turns.csv` (không dán nguyên văn dài vào repo theo luật data pack). File chatlog do BTC cấp và **không nằm trong repo** (`data/` đã gitignore); muốn kiểm lại `turn_id` thì dùng bản cục bộ từ đề bài.
 
 ## Định nghĩa "đạt" theo từng chiều chất lượng (spec §7)
 
