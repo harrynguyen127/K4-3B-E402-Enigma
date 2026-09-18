@@ -8,3 +8,4 @@ Thumbs.db
 .env
 codebase/server/.env
 codebase/server/logs/*.jsonl
+codebase/server/node_modules/
