@@ -8,6 +8,10 @@
   const $ = (id) => document.getElementById(id);
   const BANK = window.QUESTION_BANK, P = window.PERSONAS;
   const HINTS = window.HINT_BANK || {}, HINT_META = window.HINT_BANK_META || {};
+  // Mỗi câu/persona có một job riêng để prefetch không bị gọi trùng và không
+  // ghi nhầm trạng thái khi người dùng chuyển câu trong lúc model còn chạy.
+  const hintJobs = Object.create(null);
+  const hintJobErrors = Object.create(null);
   const FB_REASONS = [
     ["level", "Không đúng trình độ của tôi"],
     ["wrong_diagnosis", "Không đúng lỗi tôi mắc"],
@@ -17,27 +21,28 @@
 
   const state = {
     step: 1,
-    persona: null,          // nonit | dev | dataai | unknown
+    persona: null,          // nonit | dev | dataai | mentor | unknown
     qIndex: 0,
     answer: null,
     checked: false,         // đã nộp → khoá đáp án
     hintOpen: false,
     hintViewed: false,
+    liveHints: {},          // "Q01:nonit" -> hint sinh trực tiếp bởi model local
+    hintBusy: false,
+    hintError: null,
     ai: null,               // ExplainResponse của lần diagnose gần nhất
-    level: 0,               // 1 = bậc 1 (chẩn đoán + gợi ý) · 2 = giải thích đầy đủ
     busy: false, error: null,
     history: [],            // [{question_id, answer, verdict}]
     tStart: null,
-    level1At: null,         // thời điểm hiện bậc 1 (đo số giây trước khi bấm xem đầy đủ)
     submitted: {},          // qIndex -> "correct" | "incorrect"
     feedback: {},           // block key -> {rating, reasons[], note, sent}
-    stats: { checked: 0, wrong: 0, hint: 0, full: 0, times: [], up: 0, down: 0 }
+    stats: { checked: 0, wrong: 0, hint: 0, times: [], up: 0, down: 0 }
   };
   const q = () => BANK[state.qIndex];
 
   /* ---------- helpers ---------- */
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const pColor = (k) => ({ nonit: "var(--nonit)", dev: "var(--dev)", dataai: "var(--dataai)", unknown: "var(--unknown)" }[k] || "var(--unknown)");
+  const pColor = (k) => ({ nonit: "var(--nonit)", dev: "var(--dev)", dataai: "var(--dataai)", mentor: "var(--navy)", unknown: "var(--unknown)" }[k] || "var(--unknown)");
   function show(el, on) { el.hidden = !on; }
   function personaName() { return state.persona ? P[state.persona].name : "Chưa chọn"; }
 
@@ -47,7 +52,7 @@
       mode,
       persona: state.persona,
       persona_style: P[state.persona]?.style || null,
-      question: { id: cur.id, topic: cur.topic, stem: cur.stem, options: cur.options, correct: cur.correct, anchors: cur.anchors, anchor_confidence: cur.anchor_confidence },
+      question: { id: cur.id, topic: cur.topic, stem: cur.stem, options: cur.options, correct: cur.correct, question_type: cur.question_type || "single_choice", anchors: cur.anchors, anchor_confidence: cur.anchor_confidence },
       learner_answer: state.answer,
       attempt: 1,
       hint_viewed: state.hintViewed,
@@ -62,10 +67,9 @@
       s.classList.toggle("active", n === state.step);
       s.classList.toggle("done", n < state.step);
     });
-    const live = window.AI.isLive();
-    $("mode-badge").className = "mode-badge " + (live ? "live" : "mock");
-    $("mode-label").textContent = live ? "LIVE — gọi AI thật" : "MOCK — chưa gọi AI thật";
-    show($("mock-note"), !live);
+    document.body.classList.add("presentation-mode");
+    $("mode-badge").className = "mode-badge live";
+    $("mode-label").textContent = "LOCAL AI · Qwen 7B";
 
     // tiến độ lượt
     const done = Object.keys(state.submitted).length;
@@ -85,7 +89,7 @@
 
     const s = state.stats;
     $("st-checked").textContent = s.checked; $("st-wrong").textContent = s.wrong; $("st-hint").textContent = s.hint;
-    $("st-full").textContent = s.full; $("st-up").textContent = s.up; $("st-down").textContent = s.down;
+    $("st-up").textContent = s.up; $("st-down").textContent = s.down;
     $("st-time").textContent = s.times.length ? Math.round(s.times.reduce((a, b) => a + b, 0) / s.times.length) + " s" : "—";
 
     $("sb-anchors").innerHTML = cur.anchors.length
@@ -105,11 +109,23 @@
   }
 
   /* ---------- step 2: quiz ---------- */
+  function hintData(persona) {
+    if (window.AI.isLive()) return state.liveHints[`${q().id}:${persona}`] || null;
+    return window.AI.precomputedHint(q().id, persona);
+  }
+
   function hintFor() {
+    if (state.persona === "mentor") {
+      const found = ["nonit", "dev", "dataai"].map(k => ({ persona: k, data: hintData(k) }));
+      const rows = found.map(x => x.data?.hint ? `${P[x.persona].name}: ${x.data.hint}` : null).filter(Boolean);
+      return rows.length === 3
+        ? { text: rows.join("\n"), flagged: found.some(x => x.data?.flagged), meta: found[0].data?.meta }
+        : { text: null, why: "Chưa có đủ 3 gợi ý cho câu này." };
+    }
     if (!state.persona || state.persona === "unknown") return { text: null, why: "Chọn hồ sơ (Non-IT / IT-Dev / Data-AI) để nhận gợi ý phù hợp." };
-    const h = HINTS[q().id]?.[state.persona];
-    if (!h || !h.hint) return { text: null, why: HINT_META.generated_at ? "Chưa có gợi ý cho câu này." : "Chưa chạy sinh gợi ý (server/scripts/generate-hints.js) — gợi ý do AI sinh sẵn một lần cho 20 câu × 3 hồ sơ." };
-    return { text: h.hint, flagged: h.flagged };
+    const h = hintData(state.persona);
+    if (!h || !h.hint) return { text: null, why: window.AI.isLive() ? "Model local chưa trả về gợi ý." : (HINT_META.generated_at ? "Chưa có gợi ý cho câu này." : "Chưa có gợi ý Mock cho câu này.") };
+    return { text: h.hint, flagged: h.flagged, meta: h.meta };
   }
 
   function renderQuiz() {
@@ -125,13 +141,30 @@
 
     $("q-stem").textContent = cur.stem;
     const locked = state.checked || state.busy;
-    $("q-options").innerHTML = Object.entries(cur.options).map(([k, v]) => {
+    const multi = cur.question_type && cur.question_type !== "single_choice";
+    const selected = new Set(String(state.answer || "").toUpperCase().split(/[\s,;|]+/).filter(Boolean));
+    const correctSet = new Set(String(cur.correct || "").toUpperCase().split(/[\s,;|]+/).filter(Boolean));
+    const typeNote = multi
+      ? `<div class="small" style="margin-bottom:8px;color:var(--muted)">${cur.question_type === "ordering" ? "Chọn các bước theo thứ tự bằng cách bấm lần lượt." : "Có thể chọn nhiều phương án."}</div>`
+      : "";
+    $("q-options").innerHTML = typeNote + Object.entries(cur.options).map(([k, v]) => {
       let cls = "option"; if (locked) cls += " locked";
-      if (state.checked && state.ai && !state.ai.needs_clarification) { if (k === cur.correct) cls += " correct"; else if (k === state.answer) cls += " wrong"; }
-      else if (k === state.answer) cls += " selected";
+      if (state.checked && state.ai && !state.ai.needs_clarification) { if (correctSet.has(k)) cls += " correct"; if (selected.has(k) && !correctSet.has(k)) cls += " wrong"; }
+      else if (selected.has(k)) cls += " selected";
       return `<button class="${cls}" data-k="${k}" ${locked ? "disabled" : ""}><span class="badge">${k}</span><span>${esc(v)}</span></button>`;
     }).join("");
-    $("q-options").querySelectorAll(".option").forEach(b => b.addEventListener("click", () => { if (state.checked) return; state.answer = b.dataset.k; render(); }));
+    $("q-options").querySelectorAll(".option").forEach(b => b.addEventListener("click", () => {
+      if (state.checked) return;
+      const k = b.dataset.k;
+      if (!multi) state.answer = k;
+      else {
+        const current = String(state.answer || "").split(/[,\s]+/).filter(Boolean);
+        const at = current.indexOf(k);
+        if (at >= 0) current.splice(at, 1); else current.push(k);
+        state.answer = cur.question_type === "ordering" ? current.join(", ") : current.sort().join(", ");
+      }
+      render();
+    }));
 
     // gợi ý trước khi nộp — mặc định ẩn
     const hb = $("hint-box"); show(hb, state.hintOpen);
@@ -139,9 +172,13 @@
     if (state.hintOpen) {
       const h = hintFor();
       hb.className = "hint-box" + (h.text ? "" : " empty");
-      hb.innerHTML = h.text
-        ? `<b>Gợi ý (${esc(personaName())}):</b> ${esc(h.text)}${h.flagged ? ' <span class="small" style="color:var(--amber-text)">(đang chờ nhóm review)</span>' : ""}<span class="src">AI sinh sẵn · ${esc(HINT_META.model || "")} · ${esc((HINT_META.generated_at || "").slice(0, 10))}</span>`
-        : esc(h.why);
+      hb.innerHTML = state.hintBusy
+        ? `<span class="loading"><i></i><i></i><i></i> Qwen 7B đang sinh gợi ý theo hồ sơ…</span>`
+        : state.hintError
+          ? `<span style="color:var(--red)">Không sinh được gợi ý: ${esc(state.hintError)}</span>`
+          : h.text
+            ? `<b>Gợi ý (${esc(personaName())}):</b><span class="hint-text">${esc(h.text)}</span><span class="src">${window.AI.isLive() ? "Sinh trực tiếp bằng" : "AI sinh sẵn"} · ${esc(h.meta?.model || HINT_META.model || "Qwen 7B local")}</span>`
+            : esc(h.why);
     }
 
     $("btn-prev").disabled = state.qIndex === 0 || state.busy;
@@ -174,7 +211,7 @@
       const note = box.querySelector("input[data-note]"); if (note) note.oninput = () => { f.note = note.value; };
       const send = box.querySelector("[data-send]"); if (send) send.onclick = async () => {
         const m = meta(key);
-        const r = await window.AI.sendFeedback({ trace_id: m.trace_id, question_id: q().id, persona: state.persona, mode: m.mode, block: m.block, rating: f.rating, reasons: f.reasons, note: f.note || "" });
+        const r = await window.AI.sendFeedback({ trace_id: m.trace_id, question_id: q().id, persona: m.persona || state.persona, mode: m.mode, block: m.block, rating: f.rating, reasons: f.reasons, note: f.note || "" });
         f.sent = true; f.stored = r.stored; if (f.rating === "up") state.stats.up++; else state.stats.down++;
         render();
       };
@@ -182,14 +219,24 @@
   }
 
   /* ---------- step 3: AI ---------- */
-  function aiHeader(title, kind, ai) {
-    const mode = ai?._mode || (window.AI.isLive() ? "LIVE" : "MOCK");
+  function aiHeader(title, kind, ai, personaKey = state.persona) {
+    const mode = ai?._mode || window.AI.mode();
+    const visibleMode = mode === "LIVE" ? "API" : mode;
     const lat = ai?._latency_ms != null ? ` · ${ai._latency_ms} ms` : "";
-    return `<div class="head"><span class="tag" style="color:${pColor(state.persona)}"><span class="dot" style="background:${pColor(state.persona)}"></span>${title}</span><span class="meta">${mode}${lat} · ${kind}</span></div>`;
+    return `<div class="head"><span class="tag" style="color:${pColor(personaKey)}"><span class="dot" style="background:${pColor(personaKey)}"></span>${title}</span><span class="meta">${visibleMode}${lat} · ${kind}</span></div>`;
   }
   function citeHtml(ai) {
     if (ai.citation) return `<div class="cite"><span class="code">[${esc(ai.citation.code)}]</span> “${esc(ai.citation.quote)}” <span class="small">· độ tin cậy nguồn: ${esc(ai.citation.confidence || "")}</span></div>`;
+    if (window.AI.isLive()) return `<div class="cite none"><b>Nguồn kiến thức:</b> Giải thích dựa trên kiến thức nền tảng của chủ đề.</div>`;
     return `<div class="cite none"><b>Chưa có trích dẫn.</b> ${esc(ai.no_source_note || "Tài liệu buổi học chưa có đoạn tương ứng.")}</div>`;
+  }
+  function generationMetaHtml(ai) {
+    const m = ai?._generation;
+    if (!m) return "";
+    return `<div class="generation-meta small"><b>Cấu hình nội dung cá nhân hóa</b><br>
+      Provider: <b>${esc(m.provider || "—")}</b> · API: <b>${esc(m.api || "—")}</b> · Model: <b>${esc(m.model || "—")}</b><br>
+      Cá nhân hóa: ${esc(m.personalization || "Theo persona của học viên")}
+    </div>`;
   }
 
   function renderAI() {
@@ -204,6 +251,33 @@
     const ai = state.ai; if (!ai) return;
     const cur = q(); const pieces = [];
 
+    if (ai._compare_outputs) {
+      const correct = ai.verdict === "correct";
+      pieces.push(`<div class="banner ${correct ? "ok" : "bad"}">${correct ? "✔ Chính xác." : "✘ Chưa đúng."} Mentor đang so sánh cùng một đáp án qua ba cách giải thích.</div>`);
+      pieces.push(`<div class="card pad stack"><div class="ai-block">${aiHeader("Mentor · So sánh cả 3 hồ sơ", "3 hồ sơ · một lần kiểm tra", ai, "mentor")}
+        <div class="small">Gợi ý và lời giải được hiển thị cùng lúc; đáp án đúng và kiến thức cốt lõi không thay đổi giữa các hồ sơ.</div>
+        <div class="compare-grid">${ai._compare_outputs.map(row => {
+          const out = row.output;
+          return `<div class="ai-block">${aiHeader(P[row.persona].name, "gợi ý + giải thích", out, row.persona)}
+            ${!correct ? `<div><b>Nhận định lỗi:</b> ${esc(out.misconception || "Chưa có chẩn đoán riêng.")}</div>` : ""}
+            <div><b>Gợi ý:</b> ${esc(out.hint || (correct ? "Bạn đã chọn đúng; không cần gợi ý sửa sai." : "AI không trả về gợi ý."))}</div>
+            <div><b>Giải thích:</b> ${esc(out.explanation || "AI không trả về lời giải.")}</div>
+            ${citeHtml(out)}
+            ${fbHtml(`compare-${row.persona}`)}
+          </div>`;
+        }).join("")}</div>
+        <div class="small">Đáp án đúng: <b>${cur.correct}</b> · chấm bằng answer key, không do AI quyết định.</div>
+        ${generationMetaHtml(ai._compare_outputs[0]?.output)}
+      </div></div>`);
+      sec.innerHTML = pieces.join("");
+      wireFeedback(sec, (key) => {
+        const persona = key.replace("compare-", "");
+        const row = ai._compare_outputs.find(x => x.persona === persona);
+        return { trace_id: row?.output?._trace_id, persona, mode: "diagnose", block: `compare-${persona}` };
+      });
+      return;
+    }
+
     if (ai.needs_clarification) {
       pieces.push(`<div class="card pad stack"><div class="ai-block clarify">${aiHeader("Hệ thống chưa rõ hồ sơ của bạn", "② low-confidence → hỏi lại, không đoán", ai)}
         <div>${esc(ai.clarifying_question)}</div>
@@ -214,35 +288,21 @@
     }
 
     const correct = ai.verdict === "correct";
-    pieces.push(`<div class="banner ${correct ? "ok" : "bad"}">${correct ? "✔ Chính xác. Câu trả lời đã được ghi nhận." : "✘ Chưa đúng — câu trả lời đã được ghi nhận. Đây chính là lúc học hiệu quả nhất: đọc chẩn đoán bên dưới trước khi xem giải thích."}</div>`);
+    pieces.push(`<div class="banner ${correct ? "ok" : "bad"}">${correct ? "✔ Chính xác. Câu trả lời đã được ghi nhận." : "✘ Chưa đúng — câu trả lời đã được ghi nhận. Xem giải thích cá nhân hóa bên dưới."}</div>`);
 
-    if (!correct) {
-      pieces.push(`<div class="card pad stack"><div class="ai-block level1">${aiHeader("Bậc 1 · Bạn đang nhầm ở đâu?", "chẩn đoán lỗi", ai)}
-        <div><b>Giả định đang sai:</b> ${esc(ai.misconception || "(AI không trả về)")}</div>
-        <div><b>Gợi ý (${esc(personaName())}):</b> ${esc(ai.hint || "(AI không trả về)")}</div>
-        ${state.level < 2 ? `<div class="row"><button class="btn primary sm" id="btn-need-more">Xem giải thích đầy đủ</button><span class="small">Thử tự nghĩ lại với gợi ý trước. Việc bạn bấm nút này được ghi lại để nhóm biết bản ngắn đã đủ dễ hiểu chưa.</span></div>` : ""}
-        ${fbHtml("level1")}
-      </div></div>`);
-    }
-    if (correct || state.level >= 2) {
-      pieces.push(`<div class="card pad stack"><div class="ai-block level2">${aiHeader((correct ? "Vì sao đúng" : "Bậc 2 · Giải thích đầy đủ") + " — góc nhìn " + personaName(), "explanation", ai)}
-        <div>${esc(ai.explanation || "(AI không trả về)")}</div>
-        ${citeHtml(ai)}
-        <div class="small">Đáp án đúng: <b>${cur.correct}</b> — giống nhau cho mọi hồ sơ; chỉ cách giải thích thay đổi. <a href="#" id="lnk-compare">So sánh với hồ sơ khác</a></div>
-        <div id="compare-out"></div>
-        ${correct ? `<div class="stack" style="margin-top:6px;"><div class="label">Giải thích lại bằng lời của bạn (kiểm tra hiểu thật, không đoán)</div><textarea id="probe-text" placeholder="Vì sao đáp án ${cur.correct} đúng và các phương án kia sai?"></textarea><div class="row"><button class="btn sm" id="btn-probe">Gửi cho AI kiểm tra</button><span id="probe-out" class="small"></span></div><div id="probe-fb"></div></div>` : ""}
-        ${fbHtml("level2")}
-      </div></div>`);
-    }
+    pieces.push(`<div class="card pad stack"><div class="ai-block">${aiHeader("Giải thích — góc nhìn " + personaName(), "hint + explanation", ai)}
+      ${!correct ? `<div><b>Nhận định lỗi:</b> ${esc(ai.misconception || "(AI không trả về)")}</div>
+      <div><b>Gợi ý:</b> ${esc(ai.hint || "(AI không trả về)")}</div>` : ""}
+      <div><b>Giải thích:</b> ${esc(ai.explanation || "(AI không trả về)")}</div>
+      ${citeHtml(ai)}
+      <div class="small">Đáp án đúng: <b>${cur.correct}</b> — giống nhau cho mọi hồ sơ; chỉ cách giải thích thay đổi. <a href="#" id="lnk-compare">So sánh với hồ sơ khác</a></div>
+      ${generationMetaHtml(ai)}
+      <div id="compare-out"></div>
+      ${correct ? `<div class="stack" style="margin-top:6px;"><div class="label">Giải thích lại bằng lời của bạn (kiểm tra hiểu thật, không đoán)</div><textarea id="probe-text" placeholder="Vì sao đáp án ${cur.correct} đúng và các phương án kia sai?"></textarea><div class="row"><button class="btn sm" id="btn-probe">Gửi cho AI kiểm tra</button><span id="probe-out" class="small"></span></div><div id="probe-fb"></div></div>` : ""}
+      ${fbHtml("explanation")}
+    </div></div>`);
     sec.innerHTML = pieces.join("");
     wireFeedback(sec, (key) => ({ trace_id: state.ai?._trace_id, mode: "diagnose", block: key }));
-
-    $("btn-need-more") && ($("btn-need-more").onclick = () => {
-      state.level = 2; state.stats.full += 1; recordTime();
-      const secs = state.level1At ? Math.round((Date.now() - state.level1At) / 1000) : null;
-      window.AI.logEvent({ event: "open_full_explanation", trace_id: state.ai?._trace_id, question_id: q().id, persona: state.persona, seconds_on_level1: secs, hint_viewed: state.hintViewed });
-      render();
-    });
     $("lnk-compare") && ($("lnk-compare").onclick = (e) => { e.preventDefault(); $("compare-out").innerHTML = ["nonit", "dev", "dataai"].filter(k => k !== state.persona).map(k => `<div class="ai-block" style="margin-top:8px;"><span class="tag" style="color:${pColor(k)}"><span class="dot" style="background:${pColor(k)}"></span>${P[k].name} (lời giải mẫu của nhóm)</span><div>${esc(cur.reference[k])}</div></div>`).join(""); });
     $("btn-probe") && ($("btn-probe").onclick = runProbe);
   }
@@ -253,7 +313,24 @@
     if (!state.answer || state.busy) return;
     state.busy = true; state.error = null; state.checked = true; render();
     try {
-      const ai = await window.AI.explain(buildRequest("diagnose"));
+      let ai;
+      if (state.persona === "mentor") {
+        const outputs = await Promise.all(["nonit", "dev", "dataai"].map(async persona => {
+          const req = buildRequest("diagnose");
+          req.persona = persona;
+          req.persona_style = P[persona].style;
+          return { persona, output: await window.AI.explain(req) };
+        }));
+        ai = {
+          verdict: outputs[0].output.verdict,
+          needs_clarification: false,
+          _mode: window.AI.mode(),
+          _latency_ms: Math.max(...outputs.map(x => x.output._latency_ms || 0)),
+          _compare_outputs: outputs
+        };
+      } else {
+        ai = await window.AI.explain(buildRequest("diagnose"));
+      }
       state.ai = ai;
       if (!ai.needs_clarification) {
         if (!(state.qIndex in state.submitted)) {
@@ -262,14 +339,61 @@
           if (state.hintViewed) state.stats.hint += 1;
         }
         state.history.push({ question_id: q().id, answer: state.answer, verdict: ai.verdict });
-        if (ai.verdict === "correct") recordTime();
-        state.level = ai.verdict === "correct" ? 2 : 1;
-        state.level1At = ai.verdict === "correct" ? null : Date.now();
+        recordTime();
         if (state.step < 3) state.step = 3;
-        show($("sec-followup"), true);
+        show($("sec-followup"), state.persona !== "mentor");
       }
     } catch (e) { state.error = e.message; }
     state.busy = false; render();
+  }
+
+  async function loadLiveHints() {
+    if (!window.AI.isLive() || !state.persona || state.persona === "unknown") return;
+    const personas = state.persona === "mentor" ? ["nonit", "dev", "dataai"] : [state.persona];
+    const questionId = q().id;
+    const keys = personas.map(persona => `${questionId}:${persona}`);
+
+    const syncCurrentStatus = () => {
+      const currentPersonas = state.persona === "mentor" ? ["nonit", "dev", "dataai"] : [state.persona];
+      const currentKeys = currentPersonas.filter(Boolean).map(persona => `${q().id}:${persona}`);
+      state.hintBusy = currentKeys.some(key => Boolean(hintJobs[key]));
+      state.hintError = currentKeys.map(key => hintJobErrors[key]).find(Boolean) || null;
+    };
+
+    const jobs = personas.map(persona => {
+      const key = `${questionId}:${persona}`;
+      if (state.liveHints[key]) return Promise.resolve();
+      if (hintJobs[key]) return hintJobs[key];
+
+      // buildRequest chạy ngay tại thời điểm vào câu nên request luôn giữ đúng
+      // question/persona kể cả khi UI chuyển sang câu khác trước khi model trả lời.
+      const req = buildRequest("hint");
+      req.persona = persona;
+      req.persona_style = P[persona].style;
+      const job = window.AI.explain(req).then(output => {
+        if (!output.hint) throw new Error(`Model không trả hint cho ${persona}`);
+        state.liveHints[key] = {
+          hint: output.hint,
+          flagged: false,
+          meta: output._generation || { model: "qwen2.5:7b" }
+        };
+        delete hintJobErrors[key];
+      }).catch(e => {
+        hintJobErrors[key] = e.message || String(e);
+      }).finally(() => {
+        delete hintJobs[key];
+        syncCurrentStatus();
+        render();
+      });
+      hintJobs[key] = job;
+      return job;
+    });
+
+    syncCurrentStatus();
+    render();
+    await Promise.all(jobs);
+    syncCurrentStatus();
+    render();
   }
 
   async function runProbe() {
@@ -305,36 +429,35 @@
     show($("sec-quiz"), n >= 2);
     show($("sec-followup"), n === 3 && state.checked);
     render();
+    // Prefetch ngay khi vào câu hỏi. Người dùng vẫn làm bài bình thường; nếu
+    // mở gợi ý sớm, renderQuiz sẽ hiện trạng thái chờ cho tới khi job hoàn tất.
+    if (n >= 2 && !state.checked) void loadLiveHints();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  function resetQuestion() { state.answer = null; state.checked = false; state.hintOpen = false; state.hintViewed = false; state.ai = null; state.level = 0; state.error = null; state.level1At = null; state.tStart = null; state.feedback = {}; $("followup-out").innerHTML = ""; $("followup-text").value = ""; }
+  function resetQuestion() { state.answer = null; state.checked = false; state.hintOpen = false; state.hintViewed = false; state.hintBusy = false; state.hintError = null; state.ai = null; state.error = null; state.tStart = null; state.feedback = {}; $("followup-out").innerHTML = ""; $("followup-text").value = ""; }
   function nextQuestion() { if (state.qIndex < BANK.length - 1) { state.qIndex += 1; resetQuestion(); goStep(2); } }
   function prevQuestion() { if (state.qIndex > 0) { state.qIndex -= 1; resetQuestion(); goStep(2); } }
 
   /* ---------- trace drawer ---------- */
+  function traceSafe(value) {
+    return String(value ?? "");
+  }
   function renderTrace() {
     const list = window.Trace.all().slice().reverse();
     $("trace-count").textContent = "(" + list.length + ")";
     $("trace-list").innerHTML = list.length ? list.map(e => `
       <details class="tr">
-        <summary><span class="chip ${e.error ? "err" : (e.mode || "").toLowerCase()}">${e.error ? "LỖI" : e.mode}</span>
+        <summary><span class="chip ${e.error ? "err" : (e.mode || "").toLowerCase().replace(/\s+/g, "-")}">${e.error ? "LỖI" : traceSafe(e.mode)}</span>
           <span>${esc(e.request?.mode)} · ${esc(e.request?.question?.id)} · ${esc(e.request?.persona)} · chọn ${esc(e.request?.learner_answer ?? "—")}</span>
-          ${e.user_feedback ? `<span class="chip">${e.user_feedback.rating === "up" ? "👍" : "👎"}</span>` : ""}${e.events && e.events.length ? `<span class="chip">đã mở đầy đủ</span>` : ""}
+          ${e.user_feedback ? `<span class="chip">${e.user_feedback.rating === "up" ? "👍" : "👎"}</span>` : ""}${e.events && e.events.length ? `<span class="chip">sự kiện</span>` : ""}
           <span class="small">${e.latency_ms != null ? e.latency_ms + " ms" : ""} · ${new Date(e.ts).toLocaleTimeString("vi-VN")}</span></summary>
-        ${e.error ? `<pre>${esc(e.error)}</pre>` : ""}
-        <div class="small" style="margin-top:8px;"><b>Prompt</b></div><pre>${esc(typeof e.prompt === "string" ? e.prompt : JSON.stringify(e.prompt, null, 2))}</pre>
-        <div class="small"><b>Phản hồi thô</b></div><pre>${esc(e.raw_response ?? "")}</pre>
-        <div class="small"><b>Đã parse</b></div><pre>${esc(JSON.stringify(e.parsed, null, 2))}</pre>
-        ${e.user_feedback ? `<div class="small"><b>Phản hồi học viên</b></div><pre>${esc(JSON.stringify(e.user_feedback, null, 2))}</pre>` : ""}
-        ${e.events && e.events.length ? `<div class="small"><b>Sự kiện</b> (mở giải thích đầy đủ, số giây dừng ở bậc 1)</div><pre>${esc(JSON.stringify(e.events, null, 2))}</pre>` : ""}
-        <div class="grade" data-id="${e.id}">
-          <span class="small strong">Chấm nhanh (người chấm):</span>
-          ${[["persona_fit", "Đúng persona"], ["diagnosis", "Chẩn đoán đúng lỗi"], ["grounded", "Trích dẫn đúng / fallback đúng"], ["safe", "An toàn / không lộ đáp án ở hint"]].map(([k, l]) => `<label><input type="checkbox" data-k="${k}" ${e.eval?.[k] ? "checked" : ""}>${l}</label>`).join("")}
-        </div>
+        ${e.error ? `<pre>${esc(traceSafe(e.error))}</pre>` : ""}
+        <div class="small" style="margin-top:8px;"><b>Prompt</b></div><pre>${esc(traceSafe(typeof e.prompt === "string" ? e.prompt : JSON.stringify(e.prompt, null, 2)))}</pre>
+        <div class="small"><b>Phản hồi thô</b></div><pre>${esc(traceSafe(e.raw_response ?? ""))}</pre>
+        <div class="small"><b>Đã parse</b></div><pre>${esc(traceSafe(JSON.stringify(e.parsed, null, 2)))}</pre>
+        ${e.user_feedback ? `<div class="small"><b>Phản hồi học viên</b></div><pre>${esc(traceSafe(JSON.stringify(e.user_feedback, null, 2)))}</pre>` : ""}
+        ${e.events && e.events.length ? `<div class="small"><b>Sự kiện</b></div><pre>${esc(traceSafe(JSON.stringify(e.events, null, 2)))}</pre>` : ""}
       </details>`).join("") : `<div class="small">Chưa có lời gọi nào. Nộp một câu bằng "Kiểm tra".</div>`;
-    $("trace-list").querySelectorAll(".grade input").forEach(cb => cb.onchange = () => {
-      const id = cb.closest(".grade").dataset.id; const obj = {}; obj[cb.dataset.k] = cb.checked; window.Trace.grade(id, obj);
-    });
   }
 
   /* ---------- settings ---------- */
@@ -352,7 +475,13 @@
   /* ---------- wire ---------- */
   $("btn-check").addEventListener("click", () => { if (state.checked && state.ai && !state.ai.needs_clarification) nextQuestion(); else runDiagnose(); });
   $("btn-prev").addEventListener("click", prevQuestion);
-  $("hint-toggle").addEventListener("click", () => { state.hintOpen = !state.hintOpen; if (state.hintOpen && !state.checked && !state.hintViewed) { state.hintViewed = true; window.AI.logEvent({ event: "open_pre_submit_hint", question_id: q().id, persona: state.persona, hint_available: Boolean(hintFor().text) }); } render(); });
+  $("hint-toggle").addEventListener("click", async () => {
+    state.hintOpen = !state.hintOpen;
+    if (state.hintOpen && !state.checked && !state.hintViewed) state.hintViewed = true;
+    render();
+    if (state.hintOpen && !state.checked) await loadLiveHints();
+    if (state.hintOpen && !state.checked) window.AI.logEvent({ event: "open_pre_submit_hint", question_id: q().id, persona: state.persona, hint_available: Boolean(hintFor().text) });
+  });
   $("btn-back-persona").addEventListener("click", () => goStep(1));
   $("btn-followup").addEventListener("click", runFollowup);
   $("followup-text").addEventListener("keydown", (e) => { if (e.key === "Enter") runFollowup(); });
@@ -364,7 +493,7 @@
   $("mode-badge").addEventListener("click", openSettings);
   document.querySelectorAll('input[name=prov]').forEach(r => r.addEventListener("change", syncRadio));
   $("btn-save-settings").addEventListener("click", () => {
-    const provider = document.querySelector('input[name=prov]:checked')?.value || "mock";
+    const provider = document.querySelector('input[name=prov]:checked')?.value || "live";
     window.AI.saveSettings({ provider, endpoint: ($("endpoint").value || "http://localhost:8787").trim() });
     $("modal").classList.remove("open"); render();
   });

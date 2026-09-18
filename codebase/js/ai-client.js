@@ -4,19 +4,19 @@
  * Giao diện duy nhất:  AI.explain(request) -> Promise<ExplainResponse>
  * Schema request/response: xem codebase/AI_CONTRACT.md
  *
- * Hai provider:
- *   - "mock":  KHÔNG gọi model. Dùng lời giải mẫu trong data.questions.js.
- *              Chỉ để dựng UX / demo khi mất mạng. Badge trên UI luôn ghi MOCK.
- *   - "live":  POST {endpoint}/api/explain → server/server.js → model thật.
- *              Đây là phần bạn AI Engineer hoàn thiện (server/server.js: callModel).
+ * Pipeline giao diện luôn dùng "live": POST {endpoint}/api/explain
+ * → server/server.js → Qwen local qua Ollama. Mock chỉ còn là adapter nội bộ
+ * phục vụ smoke test, không còn là lựa chọn trên giao diện demo.
  *
  * Mọi lời gọi đều đi qua Trace (prompt + raw response + latency) — yêu cầu CP3.
  * ===================================================================== */
 window.AI = (function () {
   const SETTINGS_KEY = "enigma_ai_settings_v1";
-  const defaults = { provider: "mock", endpoint: "http://localhost:8787" };
+  const defaults = { provider: "live", endpoint: "http://localhost:8787" };
   let settings = Object.assign({}, defaults);
   try { settings = Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")); } catch (_) {}
+  // Nâng cấp cấu hình trình duyệt từ các bản demo cũ sang pipeline local thật.
+  if (settings.provider === "fake_live" || settings.provider === "mock") settings.provider = "live";
 
   function saveSettings(patch) {
     settings = Object.assign({}, settings, patch);
@@ -39,7 +39,7 @@ window.AI = (function () {
     if (persona === "unknown") {
       return {
         mode: req.mode,
-        verdict: req.learner_answer ? (req.learner_answer === q.correct ? "correct" : "incorrect") : "no_answer",
+        verdict: req.learner_answer ? (sameAnswer(req.learner_answer, q.correct, q.question_type) ? "correct" : "incorrect") : "no_answer",
         needs_clarification: true,
         clarifying_question: "Trước khi giải thích, cho mình biết công việc hằng ngày của bạn gần với nhóm nào nhất?",
         clarifying_options: Object.values(window.PERSONAS).filter(p => p.clarifier_option).map(p => ({ persona: p.key, label: p.clarifier_option })),
@@ -77,21 +77,33 @@ window.AI = (function () {
     }
 
     // mode = "diagnose": chẩn đoán lỗi + gợi ý + giải thích theo persona.
-    const wrong = req.learner_answer && req.learner_answer !== q.correct;
+    const wrong = req.learner_answer && !sameAnswer(req.learner_answer, q.correct, q.question_type);
     return baseResp(req, q, {
-      misconception: wrong
-        ? "[MOCK] Bạn chọn " + req.learner_answer + " — có vẻ bạn đang nhầm ý “" + q.options[req.learner_answer] + "” với ý đúng của câu hỏi. (Bản thật: AI nêu đúng giả định sai của bạn.)"
-        : null,
+      misconception: wrong ? mockMisconception(req, q) : null,
       hint: wrong ? HINTS[persona] : null,
       explanation: q.reference ? q.reference[persona] : "(chưa có lời giải mẫu)"
     });
+  }
+
+  function mockMisconception(req, q) {
+    const selected = String(req.learner_answer || "").toUpperCase().split(/[\s,;|]+/).filter(Boolean);
+    const correct = String(q.correct || "").toUpperCase().split(/[\s,;|]+/).filter(Boolean);
+    if (q.question_type === "multi_select") {
+      const extra = selected.filter(k => !correct.includes(k));
+      if (!extra.length && selected.length < correct.length) {
+        return `Bạn mới chọn ${selected.join(", ")} trong khi đề yêu cầu chọn tất cả; lựa chọn hiện tại chưa bao quát đủ các biến cần kiểm tra.`;
+      }
+      if (extra.length) return `Tập lựa chọn có ${extra.join(", ")} chưa phù hợp với điều kiện của câu hỏi; hãy kiểm tra lại từng yếu tố.`;
+    }
+    const label = selected.length === 1 ? q.options?.[selected[0]] : null;
+    return `Bạn chọn ${selected.join(", ")}${label ? ` — “${label}”` : ""}; lựa chọn này chưa khớp yêu cầu chính của câu hỏi.`;
   }
 
   function baseResp(req, q, patch) {
     const anchor = (q.anchors && q.anchors[0]) || null;
     return Object.assign({
       mode: req.mode,
-      verdict: req.learner_answer ? (req.learner_answer === q.correct ? "correct" : "incorrect") : "no_answer",
+      verdict: req.learner_answer ? (sameAnswer(req.learner_answer, q.correct, q.question_type) ? "correct" : "incorrect") : "no_answer",
       needs_clarification: false, clarifying_question: null, clarifying_options: null,
       misconception: null, hint: null, explanation: null,
       citation: anchor ? { code: anchor.code, quote: anchor.quote, confidence: q.anchor_confidence } : null,
@@ -99,6 +111,14 @@ window.AI = (function () {
       followup_answer: null, probe_result: null,
       safety: { refused: false, reason: null }
     }, patch);
+  }
+
+  function sameAnswer(a, b, type) {
+    if (a == null || b == null || String(a).trim() === "") return false;
+    const tokens = v => String(v).toUpperCase().split(/[\s,;|]+/).filter(Boolean);
+    const aa = tokens(a), bb = tokens(b);
+    if (type === "ordering") return aa.join(",") === bb.join(",");
+    return aa.sort().join(",") === bb.sort().join(",");
   }
 
   /* ---------------- LIVE PROVIDER ---------------- */
@@ -122,13 +142,16 @@ window.AI = (function () {
   /* ---------------- PUBLIC ---------------- */
   async function explain(request) {
     const mode = settings.provider === "live" ? "LIVE" : "MOCK";
+    const traceMode = settings.provider === "live" ? "API" : mode;
     const t0 = performance.now();
-    const traceId = window.Trace.start({ mode, provider: settings.provider === "live" ? settings.endpoint : "mock", request });
+    const traceProvider = settings.provider === "live" ? settings.endpoint : "mock";
+    const traceId = window.Trace.start({ mode: traceMode, provider: traceProvider, request });
     try {
       let parsed, raw = null, prompt = null;
       if (settings.provider === "live") {
         const out = await liveExplain(request);
         parsed = out.parsed; raw = out.raw_response; prompt = out.prompt;
+        if (out.generation) parsed._generation = out.generation;
       } else {
         await new Promise(r => setTimeout(r, 500 + Math.random() * 400)); // giả lập độ trễ
         parsed = mockExplain(request);
@@ -165,5 +188,17 @@ window.AI = (function () {
     fetch(settings.endpoint.replace(/\/$/, "") + "/api/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).catch(() => {});
   }
 
-  return { explain, sendFeedback, logEvent, settings: () => Object.assign({}, settings), saveSettings, isLive: () => settings.provider === "live" };
+  function precomputedHint(questionId, persona) {
+    const saved = window.HINT_BANK?.[questionId]?.[persona];
+    if (saved?.hint) return { hint: saved.hint, flagged: saved.flagged, meta: window.HINT_BANK_META || {} };
+    if (settings.provider === "mock") return { hint: HINTS[persona] || null, flagged: false, meta: { model: "mock rule-based", simulated: true } };
+    return { hint: null, flagged: false, meta: window.HINT_BANK_META || {} };
+  }
+
+  return {
+    explain, sendFeedback, logEvent, precomputedHint,
+    settings: () => Object.assign({}, settings), saveSettings,
+    isLive: () => settings.provider === "live",
+    mode: () => settings.provider === "live" ? "LIVE" : "MOCK"
+  };
 })();

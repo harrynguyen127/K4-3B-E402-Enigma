@@ -86,13 +86,13 @@ Hành vi UI liên quan (theo VLearn thật): **"Kiểm tra" = nộp câu**, đá
 
 ## 3c. `POST /api/event` — sự kiện hành vi (không cần model)
 
-`{ "event": "open_pre_submit_hint" | "open_full_explanation", "trace_id", "question_id", "persona", "seconds_on_level1", "hint_viewed" }` → append `server/logs/events.jsonl`. Dùng để trả lời: bản gợi ý/chẩn đoán ngắn (bậc 1) có đủ dễ hiểu không — tỉ lệ bấm xem đầy đủ và thời gian dừng ở bậc 1.
+`{ "event": "open_pre_submit_hint", "trace_id", "question_id", "persona", "hint_viewed" }` → append `server/logs/events.jsonl`. Explanation được hiển thị ngay sau khi chấm, không còn luồng hai bậc.
 
 ## 3d. `POST /api/feedback` — phản hồi của học viên (không cần model)
 
 ```jsonc
 { "trace_id": "call_…", "question_id": "Q07", "persona": "nonit", "mode": "diagnose",
-  "block": "level1" | "level2" | "followup" | "probe",
+  "block": "explanation" | "compare-nonit" | "compare-dev" | "compare-dataai" | "followup" | "probe",
   "rating": "up" | "down", "reasons": ["level","wrong_diagnosis","too_long","wrong_fact"], "note": "…" }
 ```
 Server append vào `server/logs/feedback.jsonl`. UI luôn ghi thêm vào trace (`user_feedback`) kể cả khi MOCK/offline. Dữ liệu này là bằng chứng "AI có phù hợp không" cho CP5, đối chiếu với `trace_id` để xem đúng prompt/response bị chê.

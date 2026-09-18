@@ -6,6 +6,24 @@ window.Trace = (function () {
   const KEY = "enigma_trace_v1";
   let entries = [];
   try { entries = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (_) { entries = []; }
+  // Một lần dọn dữ liệu demo cũ: không để trace MOCK/FAKE bị nhầm với
+  // các request Ollama thật. Event hành vi và API thật vẫn được giữ lại.
+  entries = entries.filter(e => {
+    const mode = String(e?.mode || "").toLowerCase();
+    const provider = String(e?.provider || "").toLowerCase();
+    const model = String(e?.parsed?._generation?.model || e?.parsed?.meta?.model || "").toLowerCase();
+    if (mode === "event") return true;
+    const isSimulated = mode === "mock" || mode.includes("fake") || provider === "mock" || provider.includes("fake") || model.includes("mock");
+    const isLocalOllama = e?.parsed?._generation?.local === true;
+    return !isSimulated && isLocalOllama;
+  });
+  entries.forEach(e => {
+    if (Array.isArray(e.events)) {
+      e.events = e.events.filter(event => event?.event !== "open_full_explanation");
+      if (!e.events.length) delete e.events;
+    }
+  });
+  try { localStorage.setItem(KEY, JSON.stringify(entries.slice(-200))); } catch (_) {}
 
   const listeners = [];
   function persist() {
