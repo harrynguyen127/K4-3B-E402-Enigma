@@ -8,8 +8,10 @@
   const $ = (id) => document.getElementById(id);
   // Demo chỉ hiện 3 câu đầu (Q01–Q03); ngân hàng đầy đủ vẫn nằm trong data.questions.js.
   // Câu hỏi dùng cho demo + bộ nhớ AI: chọn ở tab Tech (mặc định 3 câu đầu, tối đa 20), nhớ trong localStorage.
-  const SEL_KEY = "enigma_selected_questions_v1", QCOUNT_DEFAULT = 3, QCOUNT_MAX = Math.min(20, window.QUESTION_BANK.length);
-  const ALL_Q = window.QUESTION_BANK.slice(0, QCOUNT_MAX), ONE_Q = ALL_Q.map(x => [x]);
+  const SEL_KEY = "enigma_selected_questions_v2", QCOUNT_DEFAULT = 3, QCOUNT_MAX = Math.min(20, window.QUESTION_BANK.length);
+  const DEMO_ORDER = ["Q02", "Q16", "Q17", "Q20", "Q08", "Q10", "Q11", "Q07", "Q12", "Q13", "Q18", "Q19", "Q09", "Q06", "Q01", "Q14", "Q15", "Q03", "Q04", "Q05"];
+  const ORDERED_Q = DEMO_ORDER.map(id => window.QUESTION_BANK.find(q => q.id === id)).filter(Boolean);
+  const ALL_Q = ORDERED_Q.slice(0, QCOUNT_MAX), ONE_Q = ALL_Q.map(x => [x]);
   let selected = new Set(ALL_Q.slice(0, QCOUNT_DEFAULT).map(x => x.id));
   try { const s = JSON.parse(localStorage.getItem(SEL_KEY) || "null"); const ok = Array.isArray(s) ? s.filter(id => ALL_Q.some(x => x.id === id)) : []; if (ok.length) selected = new Set(ok); } catch (_) {}
   let BANK = ALL_Q.filter(x => selected.has(x.id));
@@ -41,6 +43,17 @@
     } catch (_) { serverGen = null; }
     renderChrome();
   }
+  async function loadEvidence() {
+    try {
+      const ep = window.AI.settings().endpoint.replace(/\/$/, "");
+      const results = await Promise.all(ALL_Q.map(async question => {
+        const r = await fetch(`${ep}/api/evidence?question=${encodeURIComponent(question.id)}`);
+        return [question.id, r.ok ? await r.json() : null];
+      }));
+      for (const [id, evidence] of results) if (evidence) state.evidence[id] = evidence;
+      renderChrome();
+    } catch (_) { /* evidence is optional while the server is offline */ }
+  }
   const FB_REASONS = [
     ["level", "Không đúng trình độ của tôi"],
     ["wrong_diagnosis", "Không đúng lỗi tôi mắc"],
@@ -60,6 +73,7 @@
     hintBusy: false,
     hintError: null,
     ai: null,               // ExplainResponse của lần diagnose gần nhất
+    evidence: {},           // Evidence map dùng được cả với AI-memory/mock
     busy: false, error: null,
     history: [],            // [{question_id, answer, verdict}]
     tStart: null,
@@ -92,10 +106,10 @@
 
   /* ---------- render: stepper / sidebar / mode ---------- */
   function memoryLabel(s) {
-    if (s.busy) return `DEMO · AI đang sinh bộ nhớ ${s.have}/${s.total}…`;
-    if (s.total && s.have === s.total) return `DEMO · bộ nhớ AI ${s.have}/${s.total}${s.model ? " · " + s.model : ""}`;
-    if (s.have) return `DEMO · bộ nhớ AI ${s.have}/${s.total} (phần thiếu dùng lời giải mẫu)`;
-    return "DEMO · chưa có bộ nhớ AI (dùng lời giải mẫu của nhóm)";
+    if (s.busy) return `AI · đang chuẩn bị nội dung ${s.have}/${s.total}…`;
+    if (s.total && s.have === s.total) return `AI · nội dung ${s.have}/${s.total}${s.model ? " · " + s.model : ""}`;
+    if (s.have) return `AI · nội dung ${s.have}/${s.total}`;
+    return "AI · đang chờ nội dung";
   }
 
   function renderChrome() {
@@ -109,7 +123,7 @@
     const mem = M.status(BANK), memFull = mem.total > 0 && mem.have === mem.total;
     $("mode-badge").className = isLive || (memFull && !mem.busy) ? "mode-badge live" : "mode-badge mock";
     $("mode-label").textContent = isLive
-      ? (serverGen ? `LIVE · ${serverGen.provider || "AI"}${serverGen.model ? " · " + serverGen.model : ""}` : "LIVE · đang kiểm tra server…")
+      ? (serverGen ? `AI · ${serverGen.provider || "AI"}${serverGen.model ? " · " + serverGen.model : ""}` : "AI · đang kiểm tra server…")
       : memoryLabel(mem);
 
     // tiến độ lượt
@@ -120,6 +134,13 @@
 
     // kiến thức đang luyện
     const cur = q(), c = cur.concept;
+    const evidence = state.evidence[cur.id];
+    const isMentor = state.persona === "mentor";
+    const hasEvidence = Boolean(state.checked && evidence && !isMentor);
+    document.querySelector(".grid")?.classList.toggle("has-evidence", hasEvidence);
+    document.querySelector(".grid")?.classList.toggle("mentor-layout", isMentor);
+    document.querySelector(".wrap")?.classList.toggle("evidence-layout", hasEvidence);
+    document.querySelector(".wrap")?.classList.toggle("mentor-layout", isMentor);
     $("concept-title").textContent = c ? c.title : cur.topic;
     $("concept-summary").textContent = c ? c.summary : "(chưa có tóm tắt)";
     show($("concept-draft"), Boolean(c && c.draft));
@@ -133,9 +154,11 @@
     $("st-up").textContent = s.up; $("st-down").textContent = s.down;
     $("st-time").textContent = s.times.length ? Math.round(s.times.reduce((a, b) => a + b, 0) / s.times.length) + " s" : "—";
 
-    $("sb-anchors").innerHTML = cur.anchors.length
+    show($("sb-sources"), !isMentor);
+    $("sb-anchors").innerHTML = evidenceSourcesHtml(evidence) || (cur.anchors.length
       ? `<div class="small">Độ tin cậy nguồn: <b>${cur.anchor_confidence}</b></div>` + cur.anchors.map(a => `<div style="margin-top:6px;"><span class="mono strong">[${a.code}]</span> <span class="small">${esc(a.quote).slice(0, 110)}…</span></div>`).join("")
-      : `<span style="color:var(--amber-text)">Transcript <b>không có</b> đoạn về khái niệm này → AI phải nói "chưa có nguồn", không được bịa mã đoạn (lớp ①).</span>`;
+      : `<span style="color:var(--amber-text)">Transcript <b>không có</b> đoạn về khái niệm này → AI phải nói "chưa có nguồn", không được bịa mã đoạn (lớp ①).</span>`);
+    renderEvidenceViewer(isMentor ? null : evidence);
   }
 
   /* ---------- step 1: persona ---------- */
@@ -151,11 +174,10 @@
 
   /* ---------- step 2: quiz ---------- */
   function hintData(persona) {
-    // Chế độ LIVE (dev): gợi ý vừa sinh trực tiếp được ưu tiên. Demo thường: precomputedHint → bộ nhớ AI → HINT_BANK → mock.
+    // Hint luôn lấy từ lượt gọi AI riêng theo câu hỏi và persona; không rơi về text cố định.
     const live = state.liveHints[`${q().id}:${persona}`];
     if (live) return live;
-    if (window.AI.isLive()) return null;
-    return window.AI.precomputedHint(q().id, persona);
+    return null;
   }
 
   function hintFor() {
@@ -169,7 +191,7 @@
     }
     if (!state.persona || state.persona === "unknown") return { text: null, why: "Chọn hồ sơ (Non-IT / IT-Dev / Data-AI) để nhận gợi ý phù hợp." };
     const h = hintData(state.persona);
-    if (!h || !h.hint) return { text: null, why: window.AI.isLive() ? "Model chưa trả về gợi ý." : (HINT_META.generated_at ? "Chưa có gợi ý cho câu này." : "Chưa có gợi ý Mock cho câu này.") };
+    if (!h || !h.hint) return { text: null, why: window.AI.isLive() ? "Model chưa trả về gợi ý." : "Chưa có gợi ý cho câu này." };
     return { text: h.hint, flagged: h.flagged, meta: h.meta };
   }
 
@@ -222,7 +244,7 @@
         : state.hintError
           ? `<span style="color:var(--red)">Không sinh được gợi ý: ${esc(state.hintError)}</span>`
           : h.text
-            ? `<b>Gợi ý (${esc(personaName())}):</b><span class="hint-text">${esc(h.text)}</span><span class="src">${h.meta?.generated_live ? "Vừa sinh trực tiếp lúc " + new Date(h.meta.at).toLocaleTimeString("vi-VN") + " bằng" : window.AI.isLive() ? "Sinh trực tiếp bằng" : "AI sinh sẵn"} · ${esc(h.meta?.model || HINT_META.model || modelLabel())}</span>`
+            ? `<b>Gợi ý (${esc(personaName())}):</b><span class="hint-text">${esc(h.text)}</span><span class="src">AI agent · ${esc(h.meta?.provider || h.meta?.model || modelLabel())}</span>`
             : esc(h.why);
     }
 
@@ -274,17 +296,68 @@
     const lat = ai?._latency_ms != null ? ` · ${ai._latency_ms} ms` : "";
     return `<div class="head"><span class="tag" style="color:${pColor(personaKey)}"><span class="dot" style="background:${pColor(personaKey)}"></span>${title}</span><span class="meta">${visibleMode}${lat} · ${kind}</span></div>`;
   }
-  function citeHtml(ai) {
+  function citeHtml(ai, question) {
     if (ai.citation) return `<div class="cite"><span class="code">[${esc(ai.citation.code)}]</span> “${esc(ai.citation.quote)}” <span class="small">· độ tin cậy nguồn: ${esc(ai.citation.confidence || "")}</span></div>`;
-    if (ai._mode === "MEMORY" || window.AI.isLive()) return `<div class="cite none"><b>Nguồn kiến thức:</b> Giải thích dựa trên kiến thức nền tảng của chủ đề.</div>`;
+    const ev = ai?.evidence || state.evidence[question?.id] || question?.evidence;
+    if (ev?.slide || ev?.knowledge) return "";
+    if (ai._mode === "MEMORY" || window.AI.isLive()) return `<div class="cite none"><b>Nguồn kiến thức:</b> Giải thích được suy luận theo chủ đề và hồ sơ học viên.</div>`;
     return `<div class="cite none"><b>Chưa có trích dẫn.</b> ${esc(ai.no_source_note || "Tài liệu buổi học chưa có đoạn tương ứng.")}</div>`;
+  }
+  function evidenceSourcesHtml(ev) {
+    if (!ev || (!ev.slide && !ev.knowledge)) return "";
+    const summary = ev.fallback_used
+      ? "Transcript không có đoạn trực tiếp; dùng fallback kiến thức trọng tâm cùng slide."
+      : "Transcript có đoạn liên quan; dùng cùng slide để đối chiếu.";
+    const slide = ev.slide ? `<button class="evidence-path" data-evidence-path="slide"><span class="evidence-path-head"><b>${esc(ev.slide.label)}</b><span class="confidence">${esc(ev.slide.confidence || "strong")}</span></span><span class="evidence-path-file">${esc(ev.slide.source_file || "")} <span class="open-label">· mở ${esc(ev.slide.label.toLowerCase())}</span></span></button>` : "";
+    const knowledge = ev.knowledge ? `<button class="evidence-path" data-evidence-path="knowledge"><span class="evidence-path-head"><b>${esc(ev.knowledge.label)} · ${esc(ev.knowledge.key || (ev.knowledge.id || "").replace(/^fallback:/, ""))}</b><span class="confidence">${esc(ev.knowledge.confidence || "strong")}</span></span><span class="evidence-path-file">${esc(ev.knowledge.source_file || "")} <span class="open-label">· mở toàn bộ track</span></span><span class="small">Toàn bộ track kiến thức được gửi vào prompt; chunk này chỉ dùng để định danh và map evidence.</span></button>` : "";
+    return `<div class="evidence-summary">${summary}</div>${slide}${knowledge}${ev.note ? `<div class="small evidence-note">${esc(ev.note)}</div>` : ""}`;
+  }
+  function renderEvidenceViewer(ev) {
+    const box = $("sb-evidence-viewer");
+    if (!box) return;
+    if (!state.checked || !ev || (!ev.slide && !ev.knowledge)) { box.hidden = true; box.innerHTML = ""; return; }
+    const type = state.evidenceOpen || "slide";
+    const slide = ev.slide ? `<div class="evidence-source" data-source="slide"><div class="evidence-title"><b>${esc(ev.slide.label)}</b><span>${esc(ev.slide.source_file || "")}</span></div>${ev.slide.image_url ? `<img class="evidence-slide" src="${esc(ev.slide.image_url)}" alt="${esc(ev.slide.label)}">` : ""}</div>` : "";
+    const knowledge = ev.knowledge ? `<div class="evidence-source" data-source="knowledge"><div class="evidence-title"><b>${esc(ev.knowledge.label)} · ${esc(ev.knowledge.id)}</b><span>${esc(ev.knowledge.source_file || "")}</span></div><div class="evidence-text">${highlightText(ev.knowledge.text, ev.knowledge.highlight_text)}</div></div>` : "";
+    box.hidden = false;
+    box.dataset.opened = type;
+    box.innerHTML = `<div class="evidence-heading">Evidence viewer</div>${slide}${knowledge}`;
+  }
+  function wireEvidencePaths(root) {
+    root.querySelectorAll("[data-evidence-path]").forEach(button => button.onclick = () => {
+      state.evidenceOpen = button.dataset.evidencePath;
+      render();
+      document.querySelector(`#sb-evidence-viewer [data-source="${button.dataset.evidencePath}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+  function highlightText(text, target) {
+    const source = String(text || "");
+    const needle = String(target || "").trim();
+    if (!needle) return esc(source);
+    const at = source.indexOf(needle);
+    if (at < 0) return `<mark>${esc(source)}</mark>`;
+    return `${esc(source.slice(0, at))}<mark>${esc(needle)}</mark>${esc(source.slice(at + needle.length))}`;
+  }
+  function evidenceHtml(ai, question) {
+    const ev = ai?.evidence || state.evidence[question?.id] || question?.evidence;
+    if (!ev || (!ev.slide && !ev.knowledge)) return "";
+    return `<div class="evidence-panel"><div class="evidence-heading">Nguồn grounding của explanation</div>${evidenceSourcesHtml(ev)}</div>`;
+  }
+  function mentorSourcesHtml(ev) {
+    if (!ev || (!ev.slide && !ev.knowledge)) return "";
+    const summary = ev.fallback_used
+      ? "Transcript không có đoạn trực tiếp; dùng fallback kiến thức trọng tâm cùng slide."
+      : "Transcript có đoạn liên quan; dùng cùng slide để đối chiếu.";
+    const slide = ev.slide ? `<div class="mentor-source-row"><b>${esc(ev.slide.label)}</b><span>${esc(ev.slide.source_file || "")}</span><em>${esc(ev.slide.confidence || "strong")}</em></div>` : "";
+    const knowledge = ev.knowledge ? `<div class="mentor-source-row"><b>${esc(ev.knowledge.label)} · ${esc(ev.knowledge.key || (ev.knowledge.id || "").replace(/^fallback:/, ""))}</b><span>${esc(ev.knowledge.source_file || "")}</span><em>${esc(ev.knowledge.confidence || "strong")}</em></div>` : "";
+    return `<div class="mentor-sources"><div class="evidence-heading">Nguồn grounding</div><div class="evidence-summary">${summary}</div>${slide}${knowledge}${ev.note ? `<div class="small evidence-note">${esc(ev.note)}</div>` : ""}</div>`;
   }
   function generationMetaHtml(ai) {
     const m = ai?._generation;
     if (!m) return "";
     return `<div class="generation-meta small"><b>Cấu hình nội dung cá nhân hóa</b><br>
       Provider: <b>${esc(m.provider || "—")}</b> · API: <b>${esc(m.api || "—")}</b> · Model: <b>${esc(m.model || "—")}</b><br>
-      Cá nhân hóa: ${esc(m.personalization || "Theo persona của học viên")}${m.cached ? `<br><b>Sinh sẵn</b> lúc ${esc(String(m.cached_at || "").replace("T", " ").slice(0, 16))} — lượt này không gọi model` : ""}
+      Cá nhân hóa: ${esc(m.personalization || "Theo hồ sơ của học viên")}${m.cached ? `<br><b>Nội dung chuẩn bị lúc</b> ${esc(String(m.cached_at || "").replace("T", " ").slice(0, 16))}` : ""}
     </div>`;
   }
 
@@ -305,18 +378,20 @@
       pieces.push(`<div class="banner ${correct ? "ok" : "bad"}">${correct ? "✔ Chính xác." : "✘ Chưa đúng."} Mentor đang so sánh cùng một đáp án qua ba cách giải thích.</div>`);
       pieces.push(`<div class="card pad stack"><div class="ai-block">${aiHeader("Mentor · So sánh cả 3 hồ sơ", "3 hồ sơ · một lần kiểm tra", ai, "mentor")}
         <div class="small">Lời giải của ba hồ sơ được hiển thị cùng lúc; đáp án đúng và kiến thức cốt lõi không thay đổi giữa các hồ sơ.</div>
-        <div class="compare-grid">${ai._compare_outputs.map(row => {
+        <div class="compare-grid mentor-compare">${ai._compare_outputs.map(row => {
           const out = row.output;
           return `<div class="ai-block">${aiHeader(P[row.persona].name, "giải thích", out, row.persona)}
-            <div><b>Giải thích:</b> ${esc(out.explanation || "AI không trả về lời giải.")}</div>
-            ${citeHtml(out)}
+            <div class="mentor-section mentor-hint"><div class="mentor-section-title">Hint</div><div class="hint-text">${esc(out.hint || "AI không trả về hint.")}</div></div>
+            <div class="mentor-section mentor-explanation"><div class="mentor-section-title">Explanation</div><div class="ai-explanation">${esc(out.explanation || "AI không trả về lời giải.")}</div></div>
             ${fbHtml(`compare-${row.persona}`)}
           </div>`;
         }).join("")}</div>
+        ${mentorSourcesHtml(ai._compare_outputs[0]?.output?.evidence || state.evidence[cur.id] || cur.evidence)}
         <div class="small">Đáp án đúng: <b>${cur.correct}</b> · chấm bằng answer key, không do AI quyết định.</div>
         ${generationMetaHtml(ai._compare_outputs[0]?.output)}
       </div></div>`);
       sec.innerHTML = pieces.join("");
+      wireEvidencePaths(sec);
       wireFeedback(sec, (key) => {
         const persona = key.replace("compare-", "");
         const row = ai._compare_outputs.find(x => x.persona === persona);
@@ -338,19 +413,21 @@
     pieces.push(`<div class="banner ${correct ? "ok" : "bad"}">${correct ? "✔ Chính xác. Câu trả lời đã được ghi nhận." : "✘ Chưa đúng — câu trả lời đã được ghi nhận. Xem giải thích cá nhân hóa bên dưới."}</div>`);
 
     pieces.push(`<div class="card pad stack"><div class="ai-block">${aiHeader("Giải thích — góc nhìn " + personaName(), "explanation", ai)}
-      <div><b>Giải thích:</b> ${esc(ai.explanation || "(AI không trả về)")}</div>
-      ${citeHtml(ai)}
+      <div class="ai-explanation"><b>Giải thích:</b>\n${esc(ai.explanation || "(AI không trả về)")}</div>
+      ${citeHtml(ai, cur)}
+      ${evidenceHtml(ai, cur)}
       <div class="small">Đáp án đúng: <b>${cur.correct}</b> — giống nhau cho mọi hồ sơ; chỉ cách giải thích thay đổi. <a href="#" id="lnk-compare">So sánh với hồ sơ khác</a></div>
       ${generationMetaHtml(ai)}
       <div id="compare-out"></div>
       ${fbHtml("explanation")}
     </div></div>`);
     sec.innerHTML = pieces.join("");
+    wireEvidencePaths(sec);
     wireFeedback(sec, (key) => ({ trace_id: state.ai?._trace_id, mode: "diagnose", block: key }));
-    // Cùng đáp án, hồ sơ khác: ưu tiên nội dung AI trong bộ nhớ (không gọi API), thiếu thì dùng lời giải mẫu của nhóm.
+    // Cùng đáp án, hồ sơ khác: ưu tiên nội dung AI đã gắn với grounding và hồ sơ.
     $("lnk-compare") && ($("lnk-compare").onclick = (e) => { e.preventDefault(); $("compare-out").innerHTML = ["nonit", "dev", "dataai"].filter(k => k !== state.persona).map(k => {
       const hit = M.get("diagnose", cur, k, state.answer), fromAI = Boolean(hit?.parsed?.explanation);
-      return `<div class="ai-block" style="margin-top:8px;"><span class="tag" style="color:${pColor(k)}"><span class="dot" style="background:${pColor(k)}"></span>${P[k].name} (${fromAI ? "AI · bộ nhớ" : "lời giải mẫu của nhóm"})</span><div>${esc(fromAI ? hit.parsed.explanation : cur.reference[k])}</div></div>`;
+      return `<div class="ai-block" style="margin-top:8px;"><span class="tag" style="color:${pColor(k)}"><span class="dot" style="background:${pColor(k)}"></span>${P[k].name} (${fromAI ? "AI · nội dung suy luận" : "nội dung theo hồ sơ"})</span><div class="ai-explanation">${esc(fromAI ? hit.parsed.explanation : cur.reference[k])}</div></div>`;
     }).join(""); });
   }
 
@@ -366,7 +443,7 @@
           const req = buildRequest("diagnose");
           req.persona = persona;
           req.persona_style = P[persona].style;
-          return { persona, output: await window.AI.explain(req) };
+          return { persona, output: await window.AI.explainLive(req) };
         }));
         ai = {
           verdict: outputs[0].output.verdict,
@@ -376,7 +453,7 @@
           _compare_outputs: outputs
         };
       } else {
-        ai = await window.AI.explain(buildRequest("diagnose"));
+        ai = await window.AI.explainLive(buildRequest("diagnose"));
       }
       state.ai = ai;
       if (!ai.needs_clarification) {
@@ -395,7 +472,7 @@
   }
 
   async function loadLiveHints() {
-    if (!window.AI.isLive() || !state.persona || state.persona === "unknown") return;
+    if (!state.persona || state.persona === "unknown") return;
     const personas = state.persona === "mentor" ? ["nonit", "dev", "dataai"] : [state.persona];
     const questionId = q().id;
     const keys = personas.map(persona => `${questionId}:${persona}`);
@@ -417,12 +494,12 @@
       const req = buildRequest("hint");
       req.persona = persona;
       req.persona_style = P[persona].style;
-      const job = window.AI.explain(req).then(output => {
+      const job = window.AI.explainLive(req).then(output => {
         if (!output.hint) throw new Error(`Model không trả hint cho ${persona}`);
         state.liveHints[key] = {
           hint: output.hint,
           flagged: false,
-          meta: output._generation || serverGen || { model: modelLabel() }
+          meta: Object.assign({ generated_live: true }, output._generation || serverGen || { model: modelLabel() })
         };
         delete hintJobErrors[key];
       }).catch(e => {
@@ -458,16 +535,15 @@
 
 
   /* ---------- BỘ NHỚ AI (tab Tech) + bảng log ----------
-   * Sinh một lần: mỗi mục còn thiếu (câu × hồ sơ × {gợi ý | mọi đáp án}) gọi model thật qua
-   * AI.explainLive → server ghi file cache (write-through) → M.put lưu bản sao localStorage.
-   * Sau đó "Kiểm tra"/xem gợi ý chỉ đọc M.get, không gọi API. Log lưu localStorage để còn sau F5. */
+   * Chỉ sinh khi người học cần câu hiện tại hoặc chủ động bấm nút trong Tech.
+   * Nút từng câu và nút tất cả dùng AI.explainLive → server cache → M.put.
+   * Log lưu localStorage để còn sau F5. */
   const LIVEGEN_KEY = "enigma_livegen_log_v1";
   let genLog = [];
   try { genLog = JSON.parse(localStorage.getItem(LIVEGEN_KEY) || "[]"); } catch (_) { genLog = []; }
   let genOpen = null, promptInfo = null;
   let memNote = null;          // cảnh báo hiển thị ở banner Demo + Tech (thiếu key, server lỗi, localStorage đầy…)
   let memProgress = null;      // { done, total, fail } khi đang sinh
-  let autoGenTried = false;    // tự sinh khi vào Demo chỉ thử một lần mỗi lần tải trang
   let appReady = false;
   // System prompt giống nhau ở mọi dòng và đã xem được qua GET /api/prompt-info → không lưu lặp để đỡ đầy localStorage.
   function persistGenLog() { try { localStorage.setItem(LIVEGEN_KEY, JSON.stringify(genLog.slice(-120).map(e => Object.assign({}, e, { system_prompt: null })))); } catch (_) {} }
@@ -628,13 +704,12 @@
       catch (e) { memNote = `Không đọc được cache server (${e.message || e}).`; }
       if (!todo.length) { memNote = null; render(); return; }
     }
-    if (!o.generate || (!o.manual && autoGenTried)) { render(); return; }
-    if (!o.manual) autoGenTried = true;
+    if (!o.generate) { render(); return; }
 
     let info = null;
     try { info = await (await fetch(ep + "/api/health")).json(); } catch (_) {}
-    if (!info) { memNote = "Không kết nối được server để sinh bộ nhớ AI. Đang dùng lời giải mẫu của nhóm."; render(); return; }
-    if (!info.configured || info.provider === "mock") { memNote = "Server chưa cấu hình AI thật (AI_PROVIDER và API key trong server/.env, hoặc chọn provider ở tab Tech) nên chưa sinh được bộ nhớ AI. Đang dùng lời giải mẫu của nhóm."; render(); return; }
+    if (!info) { memNote = "Không kết nối được server để chuẩn bị nội dung AI."; render(); return; }
+    if (!info.configured || info.provider === "mock") { memNote = "Chưa có cấu hình AI trực tiếp; hệ thống dùng nội dung đã chuẩn bị theo câu hỏi và grounding."; render(); return; }
     serverGen = info.generation || serverGen;
 
     memProgress = { done: 0, total: todo.length, fail: 0 };
@@ -642,7 +717,7 @@
     const res = await M.generate(todo, (item) => memWorker(item, Boolean(o.force)), { onProgress: (p) => { memProgress = p; renderMemoryStatus(); renderChrome(); renderPicker(); } });
     memProgress = null;
     if (res.aborted) memNote = `Dừng vì lỗi: ${res.lastError}. Đã sinh ${res.ok}/${todo.length} mục.`;
-    else if (res.fail) memNote = `${res.fail}/${todo.length} lời gọi lỗi (${res.lastError}). Bấm "Tạo câu gợi ý cho bộ câu hỏi" để thử lại các mục còn thiếu.`;
+    else if (res.fail) memNote = `${res.fail}/${todo.length} lời gọi lỗi (${res.lastError}). Bấm nút chạy lại để thử các mục còn thiếu.`;
     if (!res.saved) memNote = (memNote ? memNote + " " : "") + "Không lưu được bản sao trong trình duyệt (localStorage đầy hoặc bị chặn): bộ nhớ chỉ dùng được đến khi tải lại trang. Bấm \"Xoá log\" ở tab Tech rồi tải lại để lấy từ cache server.";
     render();
   }
@@ -651,16 +726,16 @@
   function renderMemoryStatus() {
     const busy = M.isBusy(), s = M.status(BANK), full = s.total > 0 && s.have === s.total;
     $("btn-memory-gen").disabled = busy; $("btn-memory-regen").disabled = busy;
-    $("btn-memory-gen").textContent = busy ? "Đang sinh…" : "Tạo câu gợi ý cho bộ câu hỏi";
+    $("btn-memory-gen").textContent = busy ? "Đang chạy…" : "Chạy tất cả câu đã chọn";
     const running = busy && memProgress;
     const progress = running ? `<span class="loading"><i></i><i></i><i></i></span> Đang gọi <b>${esc(modelLabel())}</b> · ${memProgress.done}/${memProgress.total} lời gọi xong${memProgress.fail ? ` · ${memProgress.fail} lỗi` : ""}…` : "";
     show($("livegen-progress"), Boolean(running)); if (running) $("livegen-progress").innerHTML = progress;
-    $("memory-status").innerHTML = `Bộ nhớ AI: <b>${s.have}/${s.total}</b> mục${s.model ? ` · model <b>${esc(s.model)}</b>` : ""}${s.at ? ` · cập nhật ${esc(new Date(s.at).toLocaleString("vi-VN"))}` : ""}${full ? " · <b>đủ, trả lời không cần gọi model</b>" : ""}${s.warned ? ` · ${s.warned} mục có cảnh báo kiểm tra` : ""}${memNote ? `<br><span style="color:var(--amber-text)">${esc(memNote)}</span>` : ""}`;
+    $("memory-status").innerHTML = `Nội dung AI: <b>${s.have}/${s.total}</b> mục${s.model ? ` · model <b>${esc(s.model)}</b>` : ""}${s.at ? ` · cập nhật ${esc(new Date(s.at).toLocaleString("vi-VN"))}` : ""}${full ? " · <b>đã sẵn sàng</b>" : ""}${s.warned ? ` · ${s.warned} mục có cảnh báo kiểm tra` : ""}${memNote ? `<br><span style="color:var(--amber-text)">${esc(memNote)}</span>` : ""}`;
     // Banner ở tab Demo: người xem lần đầu cần biết vì sao "Kiểm tra" đang khoá.
     const banner = $("memory-banner");
     banner.hidden = !running && !memNote;
     banner.style.background = running ? "" : "var(--amber-bg)"; banner.style.color = running ? "" : "var(--amber-text)";
-    banner.innerHTML = running ? `${progress}<div class="small" style="margin-top:4px;">Lần đầu bộ nhớ còn trống nên AI đang sinh nội dung cho cả bộ câu hỏi. Xong sẽ trả lời tức thì, không gọi AI nữa.</div>` : esc(memNote || "");
+    banner.innerHTML = running ? `${progress}<div class="small" style="margin-top:4px;">AI đang chuẩn bị nội dung cho bộ câu hỏi. Khi hoàn tất, nội dung sẽ được gắn với từng câu và nguồn grounding.</div>` : esc(memNote || "");
   }
 
   const money = (v) => v == null ? "n/a" : (v < 0.01 ? "$" + v.toFixed(5) : "$" + v.toFixed(4));
@@ -752,9 +827,7 @@
     show($("sec-quiz"), n >= 2);
     show($("sec-followup"), FOLLOWUP_ENABLED && n === 3 && state.checked);
     render();
-    // Prefetch ngay khi vào câu hỏi. Người dùng vẫn làm bài bình thường; nếu
-    // mở gợi ý sớm, renderQuiz sẽ hiện trạng thái chờ cho tới khi job hoàn tất.
-    if (n >= 2 && !state.checked) void loadLiveHints();
+    // Không prefetch: hint chỉ gọi AI sau khi người học bấm "Xem gợi ý".
     if (currentTab === "demo") window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function resetQuestion() { state.answer = null; state.checked = false; state.hintOpen = false; state.hintViewed = false; state.hintBusy = false; state.hintError = null; state.ai = null; state.error = null; state.tStart = null; state.feedback = {}; $("followup-out").innerHTML = ""; $("followup-text").value = ""; }
@@ -800,7 +873,7 @@
     if (state.step === 2 && !state.checked) return { n: "2", d2: false, do: "Chọn một đáp án rồi bấm Kiểm tra (nộp câu, không chọn lại). Gợi ý: câu 7, chọn C.", see: "Bước này giống VLearn hiện tại. Nút “Xem gợi ý” trước khi nộp là phần AI sinh theo hồ sơ (D2), gợi ý không lộ đáp án." };
     if (state.busy) return window.AI.isLive()
       ? { n: "3", d2: true, do: "AI đang chẩn đoán lỗi và soạn lời giải thích theo hồ sơ…", see: "Mỗi lời gọi được ghi vào Trace ở tab Tech (prompt, phản hồi thô, độ trễ)." }
-      : { n: "3", d2: true, do: "Đang lấy chẩn đoán và lời giải thích theo hồ sơ từ bộ nhớ AI…", see: "Mỗi lượt được ghi vào Trace ở tab Tech; nội dung do AI sinh một lần và lưu sẵn, không gọi model lúc trả lời." };
+      : { n: "3", d2: true, do: "Đang lấy chẩn đoán và lời giải thích theo hồ sơ…", see: "Mỗi lượt được ghi vào Trace ở tab Tech; nội dung được gắn với câu hỏi, hồ sơ và nguồn grounding." };
     if (state.ai?.needs_clarification) return { n: "3", d2: true, do: "Hồ sơ chưa rõ → AI hỏi lại. Chọn một nhóm để tiếp tục.", see: "Lớp ② mơ hồ: không đoán hồ sơ, không giải thích khi chưa biết người nghe là ai." };
     if (state.checked) return { n: "3", d2: true, do: "Đọc khối “Học từ lỗi”: giả định đang nhầm → gợi ý → giải thích theo hồ sơ. Rồi bấm “So sánh với hồ sơ khác”.", see: "Đây là tính năng chính: đáp án đúng không đổi, chỉ cách giảng đổi. Xem mã trích dẫn [Txx-NNN] hoặc ghi chú “chưa có nguồn”." + (FOLLOWUP_ENABLED ? " Thử ô “Hỏi thêm” với “deadline nộp lab là khi nào?” để thấy từ chối an toàn." : "") };
     return null;
@@ -858,7 +931,7 @@
           <span class="qp-body"><span class="qp-meta"><b>${esc(q.id)}</b><span class="qp-chip">${esc(q.topic || "—")}</span><span class="qp-chip">${esc(qtypeLabel[q.question_type || "single_choice"] || q.question_type)}</span></span>
           <span class="qp-stem">${esc(q.stem)}</span></span></label>
         <div class="qp-side"><span class="qp-st ${stt[0]}">${stt[1]}</span>
-          <button class="btn sm qp-gen" data-id="${esc(q.id)}" ${busy ? "disabled" : ""}>${st.have === st.total && st.total ? "Tạo lại" : "Tạo"}</button></div>
+          <button class="btn sm qp-gen" data-id="${esc(q.id)}" ${busy ? "disabled" : ""}>${st.have === st.total && st.total ? "Chạy lại câu" : "Chạy câu này"}</button></div>
       </div>`;
     }).join("");
   }
@@ -926,14 +999,14 @@ ${M.plan([q]).length} lời gọi model, bỏ qua cache.`)) return;
     try { localStorage.setItem(TAB_KEY, name); } catch (_) {}
     if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
     window.scrollTo({ top: 0 });
-    // Vào Live demo: bộ nhớ AI thiếu thì lấy từ cache server, vẫn thiếu thì sinh (một lần mỗi lần tải trang).
-    if (appReady && name === "demo") void ensureMemory({ generate: true });
+    // Vào khu vực luyện tập: chỉ đồng bộ cache, không tự chạy toàn bộ ngân hàng.
+    if (appReady && name === "demo") void ensureMemory({ generate: false });
   }
   TABS.forEach(t => $("tab-btn-" + t).addEventListener("click", () => setTab(t)));
   $("btn-go-demo").addEventListener("click", () => setTab("demo"));
   window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.includes(h) && h !== currentTab) setTab(h); });
 
-  // ?persona=dev|nonit|dataai|mentor → vào thẳng bước 2 ở tab Live demo (tiện cho demo/quay video).
+  // ?persona=dev|nonit|dataai|mentor → vào thẳng bước 2 ở khu vực luyện tập.
   const qsPersona = new URLSearchParams(location.search).get("persona");
   let initialTab = location.hash.slice(1);
   if (!TABS.includes(initialTab)) { try { initialTab = localStorage.getItem(TAB_KEY); } catch (_) { initialTab = null; } }
@@ -941,9 +1014,10 @@ ${M.plan([q]).length} lời gọi model, bỏ qua cache.`)) return;
   setTab(initialTab);
   if (qsPersona && P[qsPersona]) goStep(2); else goStep(1);
   void loadServerInfo();
+  void loadEvidence();
   void loadPromptInfo();
   void loadProviders();
-  // Khởi tạo xong: luôn đồng bộ bộ nhớ từ cache server (GET, không phải AI); chỉ sinh nếu đang ở tab Demo.
+  // Khởi tạo xong: chỉ đồng bộ bộ nhớ từ cache server, không tự gọi model.
   appReady = true;
-  void ensureMemory({ generate: currentTab === "demo" });
+  void ensureMemory({ generate: false });
 })();

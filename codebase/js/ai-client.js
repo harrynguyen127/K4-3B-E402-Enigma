@@ -9,7 +9,7 @@
  *      window.AIMemory (nội dung AI đã sinh một lần, xem js/ai-memory.js) —
  *      KHÔNG có lời gọi mạng nào.
  *   2. MOCK: mục chưa có trong bộ nhớ (và unknown/followup/probe) dùng
- *      mockExplain() — lời giải mẫu của nhóm, cũng không gọi mạng.
+ *      mockExplain() — nội dung fallback cục bộ khi chưa có kết quả suy luận.
  *   3. LIVE: chỉ khi forceLive (bộ nhớ đang sinh) hoặc dev bật LIVE trong ⚙:
  *      POST {endpoint}/api/explain → server/server.js → model đã cấu hình.
  *
@@ -39,9 +39,9 @@ window.AI = (function () {
 
   /* ---------------- MOCK PROVIDER ---------------- */
   const HINTS = {
-    nonit: "Hãy nghĩ đến một tình huống đời thường tương tự: điều gì khiến câu trả lời trở nên đáng tin hơn?",
-    dev: "Hãy vẽ pipeline request → xử lý → response trong đầu: bước nào đang bị bỏ qua ở đáp án bạn chọn?",
-    dataai: "Phân biệt cái gì nằm trong tham số mô hình và cái gì được cung cấp lúc inference — đáp án bạn chọn nhầm ở chỗ nào?"
+    nonit: "Xác định thuật ngữ hoặc điều kiện chính mà câu hỏi đang kiểm tra, rồi đối chiếu từng lựa chọn với đúng điều kiện đó; không suy luận từ ấn tượng chung.",
+    dev: "Xác định thành phần của request, pipeline hoặc measurement đang được kiểm tra, rồi đối chiếu xem lựa chọn của bạn có giữ đúng contract và điều kiện đó không.",
+    dataai: "Xác định khái niệm, biến hoặc giả định đang được kiểm tra, rồi đối chiếu quan hệ giữa các yếu tố trong đề với tiêu chí đánh giá tương ứng."
   };
 
   function mockExplain(req) {
@@ -73,7 +73,7 @@ window.AI = (function () {
         });
       }
       return baseResp(req, q, {
-        followup_answer: "[MOCK] Trả lời câu hỏi thêm theo góc nhìn " + window.PERSONAS[persona].name + ": " + (q.reference ? q.reference[persona] : "(chưa có lời giải mẫu)")
+        followup_answer: "Trả lời câu hỏi thêm theo góc nhìn " + window.PERSONAS[persona].name + ": " + (q.reference ? q.reference[persona] : "(chưa có nội dung suy luận)")
       });
     }
 
@@ -84,8 +84,8 @@ window.AI = (function () {
       return baseResp(req, q, {
         probe_result: ok ? "understood" : "needs_more",
         followup_answer: ok
-          ? "[MOCK] Lời giải thích của bạn đã nêu được ý chính. (Bản thật: AI đối chiếu với lời giải mẫu và transcript.)"
-          : "[MOCK] Bạn thử nói rõ hơn: vì sao các đáp án còn lại không đúng trong bối cảnh của câu hỏi?"
+          ? "Lời giải thích của bạn đã nêu được ý chính."
+          : "Bạn thử nói rõ hơn: vì sao các đáp án còn lại không đúng trong bối cảnh của câu hỏi?"
       });
     }
 
@@ -94,7 +94,7 @@ window.AI = (function () {
     return baseResp(req, q, {
       misconception: wrong ? mockMisconception(req, q) : null,
       hint: wrong ? HINTS[persona] : null,
-      explanation: q.reference ? q.reference[persona] : "(chưa có lời giải mẫu)"
+      explanation: q.reference ? q.reference[persona] : "(chưa có nội dung suy luận)"
     });
   }
 
@@ -120,7 +120,7 @@ window.AI = (function () {
       needs_clarification: false, clarifying_question: null, clarifying_options: null,
       misconception: null, hint: null, explanation: null,
       citation: anchor ? { code: anchor.code, quote: anchor.quote, confidence: q.anchor_confidence } : null,
-      no_source_note: anchor ? null : "Transcript các buổi trong data pack chưa có đoạn nói trực tiếp về khái niệm này, nên phần giải thích dựa trên lời giải mẫu của nhóm, chưa có trích dẫn.",
+      no_source_note: anchor ? null : "Transcript các buổi trong data pack chưa có đoạn nói trực tiếp về khái niệm này, nên phần giải thích được suy luận theo câu hỏi và hồ sơ, chưa có trích dẫn.",
       followup_answer: null, probe_result: null,
       safety: { refused: false, reason: null }
     }, patch);

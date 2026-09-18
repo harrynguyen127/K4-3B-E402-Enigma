@@ -17,6 +17,7 @@ const path = require("path");
 const vm = require("vm");
 const { spawn } = require("child_process");
 const cache = require("../cache");
+const { PROMPT_VERSION } = require("../prompt");
 // Một nguồn duy nhất cho khoá + tập đáp án (multi_select: mọi tổ hợp) — trùng với bộ nhớ phía UI.
 const { answersFor } = require("../../js/ai-memory.js");
 
@@ -70,7 +71,8 @@ async function main() {
     jobs.push({ label: `${q.id} ${pk.padEnd(6)} hint`, req: makeRequest(q, pk, style, "hint") });
     for (const ans of answersFor(q)) jobs.push({ label: `${q.id} ${pk.padEnd(6)} ${ans}`, req: makeRequest(q, pk, style, "diagnose", ans) });
   }
-  const todo = FORCE ? jobs : jobs.filter(j => !cache.get(cache.cacheKey(j.req, require("../model").activeScope())));
+  const scope = `${require("../model").activeScope()}|prompt:${PROMPT_VERSION}`;
+  const todo = FORCE ? jobs : jobs.filter(j => !cache.get(cache.cacheKey(j.req, scope)));
   console.log(`${targets.map(q => q.id).join(", ")} × ${PERSONAS.length} persona → ${jobs.length} key, cần sinh ${todo.length}${FORCE ? " (force)" : ""}`);
   if (!todo.length) { console.log("Cache đã đủ. Dùng --force để sinh lại."); return; }
 
