@@ -1,7 +1,7 @@
 # AI Contract — mắt xích quyết định trung tâm (dành cho AI Engineer)
 
-Tài liệu này mô tả **đúng một điểm** mà UI gọi AI. Bạn chỉ cần hoàn thiện hàm `callModel()` trong
-`codebase/server/server.js` (và chỉnh prompt trong `codebase/server/prompt.js`) sao cho trả về JSON đúng schema dưới đây.
+Tài liệu này mô tả **đúng một điểm** mà UI gọi AI. Lời gọi model nằm trong hàm `callModel()` ở
+`codebase/server/model.js` (prompt trong `codebase/server/prompt.js`); provider mặc định là **Anthropic (Claude)** với structured outputs bám đúng schema dưới đây.
 UI, logging, trace, eval đã sẵn — không cần sửa phần frontend.
 
 ## 1. Quyết định AI phải đưa ra
@@ -99,9 +99,9 @@ Server append vào `server/logs/feedback.jsonl`. UI luôn ghi thêm vào trace (
 
 ## 4. Việc cần làm
 
-1. Điền `callModel({ system, user })` trong **`server/model.js`** → trả về **chuỗi thô** từ model (provider tuỳ chọn, key trong `.env`). Đây là chỗ duy nhất; server và script hint đều dùng chung.
+1. `callModel({ system, user, mode })` trong **`server/model.js`** trả về **chuỗi JSON thô** từ model. Provider chọn bằng `AI_PROVIDER` trong `.env` (`anthropic` mặc định, cần `npm install` trong `codebase/server`; `ollama`/`openrouter`/`mock`). Với Anthropic, `mode` (`explain`|`hint`) chọn JSON schema cho structured outputs — sửa schema trong `prompt.js` thì sửa cả `EXPLAIN_SCHEMA` trong `model.js`.
 2. Giữ nguyên `buildPrompt()` (hoặc sửa trong `prompt.js`, tăng `PROMPT_VERSION`) và `parseModelJson()`.
-3. Chạy `node codebase/server/server.js` → mở `http://localhost:8787` → trên UI bấm ⚙ chọn **LIVE**.
+3. Chạy `node codebase/server/server.js` → mở `http://localhost:8787` (UI luôn ở LIVE; `/api/health` cho biết provider và model đang dùng).
 4. Chạy `node codebase/server/scripts/generate-hints.js --only Q07` để thử, rồi chạy không tham số cho cả bộ; đọc các mục `flagged`.
 5. Log server tự ghi `codebase/server/logs/YYYY-MM-DD.jsonl` (prompt + raw). UI cũng có nút xuất trace JSONL.
 

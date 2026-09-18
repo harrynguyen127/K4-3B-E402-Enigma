@@ -19,7 +19,7 @@
       <div class="subtitle">Học viên nộp câu trả lời trước. Khi sai, AI chỉ ra đúng giả định đang nhầm, gợi ý một bước, rồi mới giải thích theo nền tảng nghề nghiệp (Non-IT · Data/AI · IT/Dev), kèm trích dẫn transcript buổi học.</div>
     </div>
     <div class="actions">
-      <button class="mode-badge live" id="mode-badge" title="Xem cấu hình AI local"><span class="dot"></span><span id="mode-label">LOCAL AI · Qwen 7B</span></button>
+      <button class="mode-badge live" id="mode-badge" title="Xem cấu hình AI"><span class="dot"></span><span id="mode-label">LIVE · đang kiểm tra server…</span></button>
       <button class="btn" id="btn-trace">Trace <span id="trace-count" class="small">(0)</span></button>
       <button class="btn ghost" id="btn-settings" title="Cài đặt AI">⚙</button>
     </div>
@@ -154,7 +154,7 @@
 <div class="modal-bg" id="modal">
   <div class="modal">
     <h3 style="font-size:18px;">Cài đặt lời gọi AI</h3>
-    <label class="radio-row on" id="rr-live"><input type="radio" name="prov" value="live" checked><div><b>LOCAL AI</b> — hint và explanation được sinh trực tiếp bởi Qwen 2.5 7B qua Ollama.</div></label>
+    <label class="radio-row on" id="rr-live"><input type="radio" name="prov" value="live" checked><div><b>LIVE</b> — hint và explanation được sinh trực tiếp bởi model cấu hình trong <code>server/.env</code> (mặc định Claude qua Anthropic API; có thể đổi sang Ollama local).</div></label>
     <div>
       <div class="label">Endpoint server</div>
       <input type="text" id="endpoint" style="width:100%;margin-top:6px;" placeholder="http://localhost:8787">
