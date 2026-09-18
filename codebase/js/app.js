@@ -503,7 +503,7 @@
     const p = providersInfo.providers.find(x => x.id === pid);
     const sel = $("mp-model"), isMock = pid === "mock";
     const cur = wanted || p.default_model;
-    const opts = p.models.map(m => `<option value="${esc(m.id)}">${esc(m.label)} · ${esc(m.price)}</option>`);
+    const opts = p.models.map(m => `<option value="${esc(m.id)}">${esc(m.label)}${m.price && !/chưa có bảng giá/i.test(m.price) ? " · " + esc(m.price) : ""}</option>`);
     if (!isMock && cur && !p.models.some(m => m.id === cur)) opts.push(`<option value="${esc(cur)}">${esc(cur)} (đang cấu hình)</option>`);
     if (!isMock) opts.push('<option value="__custom">Khác… (nhập tên model)</option>');
     sel.innerHTML = opts.join("");
@@ -692,10 +692,10 @@
       kv("API", esc(g.api || "—")),
       kv("Effort / thinking", esc(g.effort ? g.effort + " · " + (g.thinking || "adaptive") : (g.thinking || "—"))),
       kv("Prompt version", esc(promptInfo?.prompt_version || okRows.slice(-1)[0]?.prompt_version || "—")),
-      kv("Đơn giá ($/1M token)", rate && rate.rate_in_per_mtok != null ? `in ${rate.rate_in_per_mtok} · out ${rate.rate_out_per_mtok}` : "—"),
+      rate && rate.rate_in_per_mtok != null ? kv("Đơn giá ($/1M token)", `in ${rate.rate_in_per_mtok} · out ${rate.rate_out_per_mtok}`) : "",
       kv("Lời gọi đã sinh", `${okRows.length}${errCount ? ` · ${errCount} lỗi` : ""}`, "total"),
       kv("Token in / out", `${num(tokIn)} / ${num(tokOut)}`, "total"),
-      kv("Chi phí ước tính", costRows.length ? money(cost) : "—", "total"),
+      costRows.length ? kv("Chi phí ước tính", money(cost), "total") : "",
       kv("Độ trễ TB (gọi thật)", avgLat != null ? avgLat + " ms" : "—", "total"),
       promptInfo ? `<details class="lg-sys"><summary>System prompt đang dùng (giải thích · v${esc(promptInfo.prompt_version)})</summary><pre>${esc(promptInfo.system_prompt_explain)}</pre></details>
         <details class="lg-sys"><summary>System prompt sinh gợi ý (không đưa đáp án đúng vào prompt)</summary><pre>${esc(promptInfo.system_prompt_hint)}</pre></details>` : `<div class="lg-sys small">Chưa lấy được system prompt từ server (GET /api/prompt-info).</div>`
