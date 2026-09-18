@@ -29,9 +29,14 @@ function loadBrowserData(file, key) {
 
 function looksLeaky(hint, q) {
   const h = (hint || "").toLowerCase();
-  const correctText = (q.options[q.correct] || "").toLowerCase();
-  if (correctText && h.includes(correctText.slice(0, Math.min(40, correctText.length)))) return true;
-  if (new RegExp(`(đáp án|phương án|chọn)\\s*${q.correct}\\b`, "i").test(hint || "")) return true;
+  // Multi-select keys are comma-separated (e.g. "A, C, D"), so
+  // q.options[q.correct] is undefined. Check every keyed correct option.
+  const keys = String(q.correct || "").toUpperCase().split(/[\\s,;|]+/).filter(Boolean);
+  for (const key of keys) {
+    const correctText = String(q.options?.[key] || "").toLowerCase().trim();
+    if (correctText && h.includes(correctText.slice(0, Math.min(40, correctText.length)))) return true;
+  }
+  if (keys.length && new RegExp(`(đáp án|phương án|chọn)\\s*(?:${keys.join("|")})\\b`, "i").test(hint || "")) return true;
   return false;
 }
 

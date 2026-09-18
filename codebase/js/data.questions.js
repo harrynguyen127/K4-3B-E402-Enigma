@@ -1,445 +1,528 @@
-/* =====================================================================
- * NGÂN HÀNG CÂU HỎI — chuyển từ File_Tu_lam/golden_set.md (20 câu, answer key
- * 1B 2B 3B 4A 5A 6B 7B 8B 9A 10B 11A 12B 13B 14A 15A 16B 17A 18B 19B 20C).
- *
- * Mỗi câu có:
- *  - reference: lời giải thích mẫu cho 3 persona (do nhóm viết) — dùng làm
- *    (a) đáp án tham chiếu khi chấm golden set, (b) nội dung cho chế độ MOCK.
- *  - anchors: mã đoạn transcript [Txx-NNN] thật trong data/vlearn-pack/transcript
- *    mà AI ĐƯỢC PHÉP trích dẫn. anchor_confidence:
- *      "strong"  — transcript nói trực tiếp về khái niệm
- *      "partial" — chỉ chạm tới, phải trích dẫn dè dặt
- *      "none"    — transcript KHÔNG có → AI phải nói "chưa có trong tài liệu
- *                  buổi này", KHÔNG được bịa mã đoạn (lớp ① Nguồn sự thật).
- *  - concept: {title, summary, draft} — "Kiến thức đang luyện" ở sidebar. BẢN NHÁP do
- *    Claude soạn từ reference + anchors; nhóm review rồi đổi draft:false.
- * ===================================================================== */
+/* Imported from the supplied AI-track quiz. Dev outer contract is preserved. Matching/ordering items are represented as single-choice complete mapping/sequence sets so every visible option is a complete answer and exactly one is correct. Anchors are empty because no transcript citation was verified. */
 window.QUESTION_BANK = [
   {
-    id: "Q01", topic: "LLM và kiến thức nội bộ", difficulty: "Dễ",
-    stem: "Một công ty muốn dùng LLM để trả lời câu hỏi về chính sách nội bộ. Vì sao chỉ sử dụng một LLM pretrained mà không cung cấp thêm dữ liệu công ty có thể chưa đủ?",
-    options: {
-      A: "LLM chỉ xử lý được dữ liệu dạng số",
-      B: "LLM không nhất thiết có kiến thức riêng và cập nhật về chính sách nội bộ của công ty",
-      C: "LLM không thể tạo văn bản mới",
-      D: "LLM bắt buộc phải kết nối Internet mới hoạt động"
+    "id": "Q01",
+    "topic": "fair model comparison",
+    "difficulty": "Trung bình",
+    "question_type": "multi_select",
+    "stem": "Chọn tất cả confound (biến nhiễu) phải sửa khi so sánh hai model.\n\nBối cảnh: Model A dùng prompt tiếng Việt, temperature 0 và latency tính cả setup client; Model B dùng prompt tiếng Anh ngắn hơn, temperature 1 và latency không tính setup client; mỗi model chạy một lần.",
+    "options": {
+      "A": "Prompt/language khác nhau",
+      "B": "Temperature khác nhau",
+      "C": "Measurement boundary latency khác nhau",
+      "D": "Chỉ một run nên variability chưa được đo",
+      "E": "Hai model có identity khác nhau"
     },
-    correct: "B",
-    reference: {
-      nonit: "LLM giống một người đã đọc rất nhiều sách trước khi vào công ty, nhưng chưa chắc đã đọc quy định nội bộ mới nhất. Muốn nó trả lời đúng, cần cho nó tham khảo tài liệu của chính công ty.",
-      dev: "LLM pretrained có knowledge nằm trong model weights nhưng không tự truy cập private/current data của doanh nghiệp. Application thường phải bổ sung context từ database, API hoặc RAG trước khi gọi LLM.",
-      dataai: "Pretraining giúp LLM học patterns và knowledge từ training corpus nhưng không đảm bảo coverage hay freshness với private domain knowledge. Có thể cần grounding bằng external context như RAG hoặc các kỹ thuật adaptation khác."
+    "correct": "A, B, C, D",
+    "reference": {
+      "nonit": "Hãy hình dung một cuộc thi: muốn biết model nào tốt hơn, phải giữ cách ra đề, nhiệt độ và cách bấm giờ giống nhau; chạy một lần cũng chưa cho biết độ ổn định.",
+      "dev": "Trong benchmark, model identity là biến độc lập. Prompt/language, temperature, latency boundary và số lần chạy phải được kiểm soát để tránh confounding.",
+      "dataai": "Model identity là treatment; prompt, temperature và measurement boundary là nuisance factors cần giữ cố định, còn một run không đủ ước lượng variance."
     },
-    anchors: [
-      { code: "T06-148", quote: "Bất lợi đầu tiên là knowledge cutoff: bao giờ nó cũng có cái mốc chặn trên về mặt tri thức của nhân loại được input vào." },
-      { code: "T06-147", quote: "Một trong những lý do dẫn đến hallucination nữa là nó bị cutoff." }
-    ],
-    anchor_confidence: "strong",
-    concept: { title: "Giới hạn kiến thức của LLM", summary: "Kiến thức của LLM dừng ở thời điểm huấn luyện (knowledge cutoff) và không bao gồm dữ liệu riêng của tổ chức. Muốn trả lời đúng về nội dung nội bộ, phải cung cấp tài liệu đó vào ngữ cảnh lúc hỏi.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "fair model comparison",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q02", topic: "RAG và Fine-tuning", difficulty: "Dễ",
-    stem: "Tài liệu nội bộ của công ty thay đổi hàng tuần. Vì sao RAG thường phù hợp hơn việc fine-tune lại LLM mỗi khi tài liệu thay đổi?",
-    options: {
-      A: "RAG làm LLM có nhiều parameter hơn",
-      B: "RAG có thể lấy thông tin mới tại thời điểm trả lời mà không cần huấn luyện lại model mỗi lần dữ liệu thay đổi",
-      C: "RAG không cần sử dụng LLM",
-      D: "Fine-tuning không thể áp dụng với dữ liệu văn bản"
+    "id": "Q02",
+    "topic": "secret management",
+    "difficulty": "Trung bình",
+    "question_type": "multi_select",
+    "stem": "Chọn tất cả vấn đề hoặc hành động đúng.\n\nBối cảnh: app.py hard-code API_KEY; .env đã commit; .env.example chỉ chứa API_KEY=; code đọc os.environ['API_KEY'].",
+    "options": {
+      "A": "Xóa secret hard-code khỏi app.py",
+      "B": "In API key vào log để debug",
+      "C": "Giữ .env.example không có giá trị thật",
+      "D": "Báo lỗi cấu hình rõ trước network call khi thiếu biến môi trường",
+      "E": "Bỏ theo dõi .env và thêm vào .gitignore"
     },
-    correct: "B",
-    reference: {
-      nonit: "RAG giống như cho AI mở cuốn sổ tay mới nhất trước khi trả lời. Khi quy định thay đổi, chỉ cần cập nhật cuốn sổ thay vì phải “dạy lại” AI.",
-      dev: "Knowledge nằm ngoài model. Flow thường là query → retrieve documents → build prompt → LLM. Khi tài liệu đổi, có thể update knowledge base/index thay vì retrain và redeploy model.",
-      dataai: "RAG tách parametric knowledge của model khỏi external knowledge source. Evidence được retrieve tại inference time rồi condition generation trên evidence đó, phù hợp hơn với knowledge có freshness cao."
+    "correct": "A, C, D, E",
+    "reference": {
+      "nonit": "Đừng để chìa khóa trong mã nguồn, nhật ký hay kho chung. File mẫu chỉ ghi tên ngăn kéo; ứng dụng cần báo rõ nếu chưa có chìa khóa trước khi gọi mạng.",
+      "dev": "Remove hard-coded/committed secrets, ignore .env, keep .env.example value-free, and fail fast before the network call when API_KEY is absent.",
+      "dataai": "Secret exposure is a configuration and supply-chain risk. Separate secret material from code/version control and validate required environment variables before side effects."
     },
-    anchors: [
-      { code: "T03-119", quote: "Các bạn cũng đừng quá [không nghe rõ] cái kỹ thuật gọi là fine-tuning nhá. Tại vì để sử dụng được kỹ thuật fine-tuning, các bạn phải có kinh nghiệm trong việc phát triển model, phải có dữ liệu, phải validate được." },
-      { code: "T03-036", quote: "Nãy các bạn bảo là sử dụng RAG — ok, dùng RAG cho một vài cái system nó tốt." }
-    ],
-    anchor_confidence: "partial",
-    concept: { title: "RAG và fine-tuning: khi nào dùng gì", summary: "RAG lấy tài liệu liên quan tại thời điểm trả lời nên cập nhật được ngay khi tài liệu đổi. Fine-tuning ghi kiến thức/hành vi vào trọng số, tốn dữ liệu và công validate, không phù hợp với thông tin thay đổi thường xuyên.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "secret management",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q03", topic: "RAG và Hallucination", difficulty: "Trung bình",
-    stem: "Một hệ thống RAG đã retrieve đúng tài liệu, nhưng LLM vẫn thêm một con số không xuất hiện trong tài liệu. Điều này cho thấy điều gì?",
-    options: {
-      A: "RAG đã bị lỗi hoàn toàn",
-      B: "Retrieval đúng không đảm bảo phần generation chỉ tạo ra những thông tin được evidence hỗ trợ",
-      C: "Vector database không thể dùng với số",
-      D: "Khi dùng RAG thì hallucination không thể xảy ra"
+    "id": "Q03",
+    "topic": "LLM API contract",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Call nào khớp contract client.chat.create(model, messages, temperature, max_output_tokens)?",
+    "options": {
+      "A": "Dùng prompt, system và max_tokens",
+      "B": "Gộp system/user; đảo temperature và output cap",
+      "C": "messages có role system và user; temperature=0.2; max_output_tokens=200",
+      "D": "Gọi client.responses.delete"
     },
-    correct: "B",
-    reference: {
-      nonit: "Giống như đưa đúng tài liệu cho một người đọc nhưng khi trả lời họ vẫn tự nhớ thêm một con số không có trong tài liệu. Có đúng tài liệu chưa chắc đã đảm bảo câu trả lời hoàn toàn đúng.",
-      dev: "RAG có các stage khác nhau như retrieval → generation. Retriever có thể trả đúng chunks nhưng LLM vẫn generate unsupported claims, nên application có thể cần citation hoặc verification layer.",
-      dataai: "Retrieval relevance và generation faithfulness là hai vấn đề khác nhau. Retriever có thể đạt recall tốt nhưng conditional generation vẫn sinh token sequence không được support bởi retrieved evidence."
+    "correct": "C",
+    "reference": {
+      "nonit": "Lựa chọn C tách người hướng dẫn và câu hỏi thành hai vai trò, đồng thời dùng đúng giới hạn nhiệt độ và đầu ra.",
+      "dev": "C matches the declared method and parameter contract: model, role-separated messages, temperature, and max_output_tokens.",
+      "dataai": "C preserves the semantic fields and typed role structure while assigning the specified sampling and output-cap values."
     },
-    anchors: [
-      { code: "T06-138", quote: "LLM có thể sai, và trên thực tế không bao giờ có chuyện đúng 100%." },
-      { code: "T04-047", quote: "Nó không phải là nó biết cái tri thức đấy, mà là nó đang dự đoán những từ tiếp theo, hoặc là những token." }
-    ],
-    anchor_confidence: "partial",
-    concept: { title: "Retrieval đúng ≠ generation trung thực", summary: "RAG gồm hai bước tách biệt: tìm tài liệu và sinh câu trả lời. Tìm đúng tài liệu không đảm bảo phần sinh chỉ dùng thông tin trong đó, vì LLM vẫn là mô hình dự đoán token và có thể sai.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "LLM API contract",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q04", topic: "Embedding", difficulty: "Trung bình",
-    stem: "Trong hệ thống RAG, vì sao câu “Tôi không đăng nhập được” có thể retrieve tài liệu “Hướng dẫn xử lý lỗi authentication” dù hai câu không có nhiều từ giống nhau?",
-    options: {
-      A: "Embedding có thể biểu diễn sự tương đồng về ngữ nghĩa thay vì chỉ dựa vào exact keyword matching",
-      B: "LLM đã ghi nhớ toàn bộ database",
-      C: "Vector database tự dịch tất cả câu sang tiếng Anh",
-      D: "RAG chỉ tìm kiếm bằng keyword"
+    "id": "Q04",
+    "topic": "finish reason",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Ghép finish reason giả định với xử lý trực tiếp phù hợp.",
+    "options": {
+      "A": "stop → Trả về kết quả hoàn chỉnh bình thường; length → Cảnh báo hoặc gọi tiếp để sinh thêm token do bị giới hạn độ dài; tool_calls / function_call → Chuyển giao thực thi cho hàm/tool handler",
+      "B": "stop → Cảnh báo hoặc gọi tiếp; length → Chuyển giao cho tool handler; tool_calls / function_call → Trả về kết quả hoàn chỉnh bình thường",
+      "C": "stop → Chuyển giao cho tool handler; length → Trả về kết quả hoàn chỉnh bình thường; tool_calls / function_call → Cảnh báo hoặc gọi tiếp",
+      "D": "stop → Trả về kết quả hoàn chỉnh bình thường; length → Chuyển giao cho tool handler; tool_calls / function_call → Cảnh báo hoặc gọi tiếp"
     },
-    correct: "A",
-    reference: {
-      nonit: "AI có thể nhận ra hai câu đang nói về cùng một vấn đề dù dùng từ khác nhau. “Không đăng nhập được” và “lỗi authentication” đều liên quan đến việc đăng nhập.",
-      dev: "Embedding model encode query và documents thành vectors. Vector DB sau đó chạy similarity search nên không yêu cầu exact keyword match.",
-      dataai: "Embedding ánh xạ text vào representation space, nơi semantic similarity được phản ánh qua khoảng cách hoặc similarity giữa vectors, chẳng hạn cosine similarity."
+    "correct": "A",
+    "reference": {
+      "nonit": "Finish metadata cho biết lý do quá trình sinh kết thúc: dừng tự nhiên, bị giới hạn độ dài hoặc yêu cầu gọi công cụ. Vì vậy không nên chỉ dựa vào phần text để quyết định bước xử lý tiếp theo.",
+      "dev": "Finish metadata cho biết lý do quá trình sinh kết thúc: dừng tự nhiên, bị giới hạn độ dài hoặc yêu cầu gọi công cụ. Vì vậy không nên chỉ dựa vào phần text để quyết định bước xử lý tiếp theo.",
+      "dataai": "Finish metadata cho biết lý do quá trình sinh kết thúc: dừng tự nhiên, bị giới hạn độ dài hoặc yêu cầu gọi công cụ. Vì vậy không nên chỉ dựa vào phần text để quyết định bước xử lý tiếp theo."
     },
-    anchors: [
-      { code: "T06-130", quote: "Cứ một từ — đơn giản hóa gọi một từ là một token — thì làm sao mỗi từ đấy chúng ta biểu diễn nó trong không gian..." }
-    ],
-    anchor_confidence: "partial",
-    concept: { title: "Embedding và tương đồng ngữ nghĩa", summary: "Embedding biến câu chữ thành vector sao cho câu cùng ý nằm gần nhau, dù dùng từ khác. Nhờ vậy truy hồi theo nghĩa thay vì chỉ khớp từ khoá.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "finish reason",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q05", topic: "Context Window", difficulty: "Trung bình",
-    stem: "Một request gửi vào LLM gồm: System prompt 2K tokens · Chat history 6K tokens · Retrieved documents 5K tokens · Expected output 3K tokens. Model có context window 16K. Vì sao tiếp tục thêm tài liệu retrieval có thể gây vấn đề?",
-    options: {
-      A: "Prompt, history, context và phần output cần sinh đều cạnh tranh trong giới hạn context của model",
-      B: "LLM chỉ cho phép một retrieved document",
-      C: "RAG không thể hoạt động cùng chat history",
-      D: "Context window chỉ tính output token"
+    "id": "Q05",
+    "topic": "API latency",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Với non-streaming request, code nào đo raw API call latency đúng boundary nhất?",
+    "options": {
+      "A": "Gọi API rồi mới start timer",
+      "B": "Start timer ngay trước call, dừng ngay sau call",
+      "C": "Đo cả load dữ liệu và render",
+      "D": "Dùng total_tokens làm latency"
     },
-    correct: "A",
-    reference: {
-      nonit: "Context window giống bàn làm việc của AI. Lịch sử chat, tài liệu và câu trả lời đều cần chỗ trên chiếc bàn đó. Đặt quá nhiều tài liệu lên bàn sẽ khiến không còn đủ chỗ cho phần khác.",
-      dev: "Application phải quản lý token budget giữa system prompt, messages, retrieved context và generation. Khi gần context limit có thể cần truncate, summarize hoặc giảm số chunks retrieve.",
-      dataai: "Context window giới hạn sequence model có thể condition trên. Retrieval thêm token không chỉ chiếm sequence budget mà còn có thể tăng context dilution và inference cost."
+    "correct": "B",
+    "reference": {
+      "nonit": "Timer phải bắt đầu ngay trước API call và kết thúc ngay sau khi call hoàn thành. Nếu đưa load dữ liệu hoặc render vào khoảng đo thì không còn đo riêng raw API latency.",
+      "dev": "Timer phải bắt đầu ngay trước API call và kết thúc ngay sau khi call hoàn thành. Nếu đưa load dữ liệu hoặc render vào khoảng đo thì không còn đo riêng raw API latency.",
+      "dataai": "Timer phải bắt đầu ngay trước API call và kết thúc ngay sau khi call hoàn thành. Nếu đưa load dữ liệu hoặc render vào khoảng đo thì không còn đo riêng raw API latency."
     },
-    anchors: [
-      { code: "T04-051", quote: "Context ở đây nghĩa là gì? Là toàn bộ những thông tin mà một mô hình nó có thể tiêu thụ trong một lần." },
-      { code: "T04-052", quote: "Context rot: khi bạn càng đưa nhiều thông tin, càng đưa nhiều ngữ cảnh, thì cái mô hình càng ngày về sau nó sẽ càng kém đi, và nó sẽ thường quên những thông tin ở lúc đầu." },
-      { code: "T06-149", quote: "Cái thứ ba là context window: mô hình chỉ nhìn được một lượng nhất định." }
-    ],
-    anchor_confidence: "strong",
-    concept: { title: "Context window là ngân sách chung", summary: "Mọi thứ đưa vào một lượt gọi (system prompt, lịch sử, tài liệu truy hồi) và cả phần trả lời đều chia chung một giới hạn token. Nhồi thêm tài liệu làm hết chỗ cho phần khác và mô hình dễ 'quên' đầu ngữ cảnh (context rot).", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "API latency",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q06", topic: "Tokenization", difficulty: "Dễ",
-    stem: "Hai prompt truyền tải gần như cùng lượng thông tin, một bằng tiếng Việt và một bằng tiếng Anh, nhưng số token khác nhau. Nguyên nhân hợp lý nhất là gì?",
-    options: {
-      A: "Một từ luôn tương ứng với một token",
-      B: "Tokenizer chia văn bản thành các đơn vị phụ thuộc vào chuỗi ký tự, ngôn ngữ và cách biểu diễn",
-      C: "Tiếng Việt không sử dụng tokenizer",
-      D: "Context window được tính bằng số từ"
+    "id": "Q06",
+    "topic": "provider API mapping",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Ghép semantic field tương đương giữa Provider A và B.",
+    "options": {
+      "A": "model → model_id; messages[role=system].content → system; messages[role=user].content → input",
+      "B": "model → system; messages[role=system].content → input; messages[role=user].content → model_id",
+      "C": "model → input; messages[role=system].content → model_id; messages[role=user].content → system",
+      "D": "model → model_id; messages[role=system].content → input; messages[role=user].content → system"
     },
-    correct: "B",
-    reference: {
-      nonit: "AI không đọc văn bản chính xác theo từng “từ” như con người. Một từ có thể bị chia thành nhiều mảnh nhỏ, vì vậy hai câu dài tương đương vẫn có số token khác nhau.",
-      dev: "Tokenizer encode raw string thành sequence các token ID. Language, punctuation, code và formatting khác nhau có thể tạo segmentation khác nhau.",
-      dataai: "Tokenization ánh xạ text sang discrete subword units theo vocabulary của model. Segmentation efficiency khác nhau giữa languages/domains, ảnh hưởng sequence length và computational cost."
+    "correct": "A",
+    "reference": {
+      "nonit": "Hai provider có thể sử dụng container format khác nhau nhưng các trường vẫn có thể được ánh xạ theo cùng ý nghĩa: model identifier, system instruction và user input.",
+      "dev": "Hai provider có thể sử dụng container format khác nhau nhưng các trường vẫn có thể được ánh xạ theo cùng ý nghĩa: model identifier, system instruction và user input.",
+      "dataai": "Hai provider có thể sử dụng container format khác nhau nhưng các trường vẫn có thể được ánh xạ theo cùng ý nghĩa: model identifier, system instruction và user input."
     },
-    anchors: [
-      { code: "T04-049", quote: "Token — nó sẽ là một đơn vị tính — nó không phải là từ, không phải là chữ cái, mà nó là token." },
-      { code: "T06-134", quote: "Đơn vị cơ bản của LLM là cái nãy giờ chúng ta gọi là token. Quá trình huấn luyện dữ liệu đầu vào trước đây chủ yếu dùng tiếng Anh." },
-      { code: "T06-135", quote: "Cái LLM nó không đọc ký tự các bạn nhá... không đọc ký tự trái sang phải, cũng không đọc word by word." }
-    ],
-    anchor_confidence: "strong",
-    concept: { title: "Token không phải từ", summary: "LLM xử lý văn bản theo token, đơn vị nhỏ hơn hoặc khác với từ. Cách tách phụ thuộc tokenizer và ngôn ngữ; tiếng Việt thường tốn nhiều token hơn tiếng Anh cho cùng nội dung.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "provider API mapping",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q07", topic: "Temperature", difficulty: "Dễ",
-    stem: "Một LLM được chạy nhiều lần với cùng prompt nhưng đôi lúc diễn đạt câu trả lời khác nhau. Nếu muốn output ổn định hơn, thay đổi nào hợp lý nhất?",
-    options: {
-      A: "Tăng temperature",
-      B: "Giảm temperature, nhưng không coi điều đó là đảm bảo câu trả lời đúng",
-      C: "Tăng embedding dimension",
-      D: "Giảm context window"
+    "id": "Q07",
+    "topic": "temperature",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Ứng dụng cần tạo mã phân loại ổn định giữa các lần chạy. Cấu hình nào phù hợp hơn?",
+    "options": {
+      "A": "Temperature thấp",
+      "B": "Không giới hạn output và tăng temperature",
+      "C": "Temperature rất cao",
+      "D": "Đổi temperature ngẫu nhiên mỗi request"
     },
-    correct: "B",
-    reference: {
-      nonit: "Temperature có thể hiểu như mức độ “tự do” khi AI lựa chọn cách nói. Giảm nó khiến AI thiên về các lựa chọn quen thuộc hơn nên kết quả thường ổn định hơn, nhưng vẫn có thể trả lời sai.",
-      dev: "Temperature là generation parameter. Lower temperature làm token distribution tập trung hơn nên API output thường ít biến thiên hơn, nhưng factual correctness vẫn phải evaluate riêng.",
-      dataai: "Temperature rescale logits trước sampling. Với T<1, probability mass thường tập trung hơn vào high-logit tokens và entropy giảm, nhưng maximum-likelihood generation không đồng nghĩa truthfulness."
+    "correct": "A",
+    "reference": {
+      "nonit": "Nhiệt độ thấp giống như yêu cầu người trả lời bám sát một mẫu cố định hơn; nó giảm ngẫu nhiên nhưng không hứa chắc mọi lần giống hệt.",
+      "dev": "Lower temperature reduces sampling variance for a classification-format path, but determinism still depends on provider/runtime controls.",
+      "dataai": "Lower temperature concentrates the sampling distribution, improving repeatability under otherwise fixed conditions; it is not an absolute determinism guarantee."
     },
-    anchors: [
-      { code: "T04-072", quote: "Nếu temperature bằng 0, mô hình sẽ luôn luôn lấy xác suất cao nhất... Nhưng khi bạn tăng temperature lên, nó sẽ random rộng hơn trong phạm vi đấy." }
-    ],
-    anchor_confidence: "strong",
-    concept: { title: "Temperature điều khiển độ ngẫu nhiên", summary: "Temperature thấp khiến mô hình thiên về token xác suất cao nhất nên kết quả ổn định hơn giữa các lần chạy. Ổn định không đồng nghĩa với đúng sự thật.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "temperature",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q08", topic: "Transformer và Attention", difficulty: "Khó",
-    stem: "Trong Transformer, vai trò chính của self-attention là gì?",
-    options: {
-      A: "Lưu toàn bộ conversation vào database",
-      B: "Cho phép representation của một token được xây dựng dựa trên mức độ liên quan với các token khác trong context",
-      C: "Kiểm tra thông tin trên Internet có đúng không",
-      D: "Chuyển token thành API request"
+    "id": "Q08",
+    "topic": "attention",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Ghép thành phần attention với vai trò khái niệm tương ứng.",
+    "options": {
+      "A": "Queries (Q) và Keys (K) → Tương tác để tính compatibility scores/attention weights; Values (V) → Chứa thông tin nội dung được tổng hợp theo trọng số attention",
+      "B": "Queries (Q) và Keys (K) → Chứa nội dung được tổng hợp; Values (V) → Tính compatibility scores/attention weights",
+      "C": "Queries (Q) và Keys (K) → Chỉ lưu token đầu vào; Values (V) → Tạo causal mask",
+      "D": "Queries (Q) và Keys (K) → Tạo output cuối trực tiếp; Values (V) → Tính độ tương thích giữa vị trí"
     },
-    correct: "B",
-    reference: {
-      nonit: "Khi đọc một câu, bạn thường chú ý đến những từ liên quan để hiểu một từ đang nói về điều gì. Attention giúp AI làm điều tương tự: xác định phần nào trong câu đáng chú ý hơn.",
-      dev: "Transformer tạo Query, Key và Value từ token representations. Query được so với Keys để tạo attention weights, sau đó dùng weights để aggregate Values.",
-      dataai: "Self-attention tính compatibility giữa Q và K, thường bằng scaled dot-product, softmax thành attention distribution rồi dùng distribution đó để weighted-sum V."
+    "correct": "A",
+    "reference": {
+      "nonit": "Q và K được dùng để xác định mức liên quan giữa các vị trí. Sau khi chuẩn hóa thành attention weights, các trọng số này được sử dụng để tổng hợp thông tin từ V.",
+      "dev": "Q và K được dùng để xác định mức liên quan giữa các vị trí. Sau khi chuẩn hóa thành attention weights, các trọng số này được sử dụng để tổng hợp thông tin từ V.",
+      "dataai": "Q và K được dùng để xác định mức liên quan giữa các vị trí. Sau khi chuẩn hóa thành attention weights, các trọng số này được sử dụng để tổng hợp thông tin từ V."
     },
-    anchors: [
-      { code: "T06-086", quote: "Cái self-attention bản chất là mỗi một token sẽ nhìn các token khác trong ngữ cảnh đang đặt ra." },
-      { code: "T06-130", quote: "Cái cơ chế self-attention ở đây, hiểu một cách thân thiện: cứ một từ... thì làm sao mỗi từ đấy chúng ta biểu diễn nó trong không gian." }
-    ],
-    anchor_confidence: "strong",
-    concept: { title: "Self-attention", summary: "Mỗi token 'nhìn' các token khác trong ngữ cảnh và gán trọng số liên quan để xây biểu diễn của chính nó. Đây là cơ chế cốt lõi giúp Transformer hiểu quan hệ giữa các từ.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "attention",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q09", topic: "Fine-tuning + RAG", difficulty: "Trung bình",
-    stem: "Một chatbot cần vừa giữ phong cách trả lời chuyên biệt, vừa sử dụng thông tin sản phẩm thay đổi hàng tuần. Architecture nào hợp lý?",
-    options: {
-      A: "Fine-tuning có thể dùng cho behavior/style ổn định, còn RAG cung cấp knowledge thường xuyên thay đổi",
-      B: "Fine-tune lại model mỗi ngày để ghi nhớ tài liệu",
-      C: "Chỉ tăng temperature",
-      D: "Chỉ sử dụng vector database, không cần LLM"
+    "id": "Q09",
+    "topic": "Transformer Post-Norm",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Theo quy ước Post-Norm rút gọn, hãy sắp xếp trình tự luồng xử lý chính trong một Transformer block.",
+    "options": {
+      "A": "Multi-Head Self-Attention → Residual Add & LayerNorm → Feed-Forward Network → Residual Add & LayerNorm",
+      "B": "Multi-Head Self-Attention → Feed-Forward Network → Residual Add & LayerNorm → Residual Add & LayerNorm",
+      "C": "Residual Add & LayerNorm → Multi-Head Self-Attention → Residual Add & LayerNorm → Feed-Forward Network",
+      "D": "Feed-Forward Network → Residual Add & LayerNorm → Multi-Head Self-Attention → Residual Add & LayerNorm"
     },
-    correct: "A",
-    reference: {
-      nonit: "Fine-tuning giống đào tạo nhân viên cách nói chuyện và làm việc. RAG giống đưa cho họ tài liệu mới nhất để tra cứu. Hai thứ giải quyết hai nhu cầu khác nhau.",
-      dev: "Fine-tuning thay đổi model behavior thông qua weights, còn product documents nằm trong retrieval layer. Khi dữ liệu đổi chỉ cần update knowledge base/index.",
-      dataai: "Fine-tuning thực hiện parameter adaptation, còn RAG cung cấp non-parametric external knowledge tại inference time. Tách hai cơ chế giúp stable behavior và changing knowledge được quản lý riêng."
+    "correct": "A",
+    "reference": {
+      "nonit": "Trong Transformer Post-Norm, mỗi sublayer được thực hiện trước, sau đó output của sublayer được cộng với residual connection rồi mới LayerNorm. Quy trình này diễn ra cho attention và sau đó cho FFN.",
+      "dev": "Trong Transformer Post-Norm, mỗi sublayer được thực hiện trước, sau đó output của sublayer được cộng với residual connection rồi mới LayerNorm. Quy trình này diễn ra cho attention và sau đó cho FFN.",
+      "dataai": "Trong Transformer Post-Norm, mỗi sublayer được thực hiện trước, sau đó output của sublayer được cộng với residual connection rồi mới LayerNorm. Quy trình này diễn ra cho attention và sau đó cho FFN."
     },
-    anchors: [
-      { code: "T03-119", quote: "Nếu đụng đến fine-tuning, đa phần là các bạn đang cố deploy hệ thống vào một lĩnh vực ngách rất đặc thù." }
-    ],
-    anchor_confidence: "partial",
-    concept: { title: "Kết hợp fine-tuning và RAG", summary: "Fine-tuning phù hợp cho hành vi/phong cách ổn định; RAG phù hợp cho kiến thức thay đổi. Hai cơ chế giải quyết hai nhu cầu khác nhau và có thể dùng cùng lúc.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "Transformer Post-Norm",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q10", topic: "AI Agent", difficulty: "Dễ",
-    stem: "Điểm khác biệt quan trọng giữa một LLM chatbot thông thường và AI Agent là gì?",
-    options: {
-      A: "Agent luôn sử dụng model lớn hơn",
-      B: "Agent có thể theo đuổi goal qua nhiều bước, chọn action/tool dựa trên state và observation nhận được",
-      C: "Agent luôn phải có giao diện chat",
-      D: "Agent không sử dụng LLM"
+    "id": "Q10",
+    "topic": "encoder-decoder attention",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Ghép attention path với nguồn thông tin mà nó truy cập trong kiến trúc Transformer encoder–decoder chuẩn.",
+    "options": {
+      "A": "Encoder self-attention → Các source positions trong encoder input; Decoder causal self-attention → Các target positions hiện tại/quá khứ được causal mask cho phép; Decoder cross-attention → Encoder outputs",
+      "B": "Encoder self-attention → Encoder outputs; Decoder causal self-attention → Các source positions; Decoder cross-attention → Target positions tương lai",
+      "C": "Encoder self-attention → Target positions; Decoder causal self-attention → Encoder outputs; Decoder cross-attention → Source positions chưa mã hóa",
+      "D": "Encoder self-attention → Các target positions; Decoder causal self-attention → Các target positions tương lai; Decoder cross-attention → Chính nó"
     },
-    correct: "B",
-    reference: {
-      nonit: "Chatbot giống người bạn hỏi một câu rồi trả lời. Agent giống trợ lý được giao một mục tiêu: nó có thể kiểm tra thông tin, làm một bước, xem kết quả rồi quyết định tiếp theo cần làm gì.",
-      dev: "Agent thêm control loop quanh LLM: state → model decision → tool/action → observation → state update → next decision.",
-      dataai: "Agent có thể xem như policy thực hiện sequential decision-making dựa trên current state và observations, thay vì chỉ conditional text generation một lần."
+    "correct": "A",
+    "reference": {
+      "nonit": "Encoder self-attention xử lý các vị trí của source sequence. Decoder causal self-attention không được nhìn các target token tương lai. Cross-attention cho phép decoder truy cập biểu diễn do encoder tạo ra.",
+      "dev": "Encoder self-attention xử lý các vị trí của source sequence. Decoder causal self-attention không được nhìn các target token tương lai. Cross-attention cho phép decoder truy cập biểu diễn do encoder tạo ra.",
+      "dataai": "Encoder self-attention xử lý các vị trí của source sequence. Decoder causal self-attention không được nhìn các target token tương lai. Cross-attention cho phép decoder truy cập biểu diễn do encoder tạo ra."
     },
-    anchors: [
-      { code: "T04-073", quote: "Bây giờ chúng ta làm cho mô hình có tay, có chân, có bộ não, có thêm nhiều ngữ cảnh khác để làm được việc — đấy là con đường đi đến AI agent. Hiểu nôm na, nó không phải chỉ sinh văn bản nữa: nó có thể làm được việc, có thể tương tác với thế giới." }
-    ],
-    anchor_confidence: "strong",
-    concept: { title: "Chatbot và AI agent", summary: "Chatbot trả lời một lượt. Agent được giao mục tiêu, có thể gọi công cụ, quan sát kết quả rồi quyết định bước tiếp theo, lặp cho tới khi xong việc.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "encoder-decoder attention",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q11", topic: "Agent Loop", difficulty: "Trung bình",
-    stem: "Agent được giao: “Tìm lịch trống của tôi và Nam rồi đặt meeting 30 phút.” Sau khi gọi Calendar API, agent phát hiện Nam không rảnh vào thời gian dự kiến. Tại sao agent cần thay đổi plan?",
-    options: {
-      A: "Observation mới phải cập nhật state và ảnh hưởng đến action tiếp theo của agent",
-      B: "Agent chỉ được gọi tool một lần",
-      C: "Calendar phải được fine-tune vào LLM",
-      D: "Agent phải xóa toàn bộ conversation"
+    "id": "Q11",
+    "topic": "LLM training stages",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Ghép thay đổi kỹ thuật với trục cải tiến phù hợp nhất đối với mô hình ngôn ngữ.",
+    "options": {
+      "A": "Tăng corpus và compute cho next-token training → Pre-training; Instruction/preference tuning (SFT/RLHF) sau base model → Post-training; Giữ nguyên weights, dùng nhiều bước reasoning/search khi trả lời → Test-time compute",
+      "B": "Tăng corpus và compute cho next-token training → Post-training; Instruction/preference tuning sau base model → Test-time compute; Reasoning/search khi trả lời → Pre-training",
+      "C": "Tăng corpus và compute → Test-time compute; SFT/RLHF → Pre-training; Reasoning/search → Post-training",
+      "D": "Cả ba thay đổi đều là fine-tuning vì đều cải thiện chất lượng model"
     },
-    correct: "A",
-    reference: {
-      nonit: "Giống như trợ lý kiểm tra lịch và phát hiện Nam bận. Nếu vẫn đặt đúng giờ cũ thì việc kiểm tra lịch chẳng còn ý nghĩa; trợ lý phải tìm phương án khác.",
-      dev: "Calendar result được append thành observation trong agent state. Model turn tiếp theo consume state mới để chọn action như search slot khác hoặc ask user.",
-      dataai: "Đây là closed-loop decision-making: action_t → observation_t → state_{t+1} → action_{t+1}. Observation mới thay đổi information state nên policy có thể thay đổi action."
+    "correct": "A",
+    "reference": {
+      "nonit": "Pre-training xây dựng base model; post-training điều chỉnh hành vi sau khi đã có base model; test-time compute tăng lượng xử lý tại inference mà không cần thay đổi weights.",
+      "dev": "Pre-training xây dựng base model; post-training điều chỉnh hành vi sau khi đã có base model; test-time compute tăng lượng xử lý tại inference mà không cần thay đổi weights.",
+      "dataai": "Pre-training xây dựng base model; post-training điều chỉnh hành vi sau khi đã có base model; test-time compute tăng lượng xử lý tại inference mà không cần thay đổi weights."
     },
-    anchors: [
-      { code: "T04-073", quote: "Để làm được việc đấy, nó cần được gắn tay, gắn chân — kết nối với các công cụ, với thế giới bên ngoài." }
-    ],
-    anchor_confidence: "partial",
-    concept: { title: "Vòng lặp agent: quan sát cập nhật kế hoạch", summary: "Sau mỗi hành động, kết quả quan sát được cập nhật vào trạng thái và ảnh hưởng hành động kế tiếp. Agent không đi theo kịch bản cố định mà điều chỉnh theo thực tế.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "LLM training stages",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q12", topic: "Tool Calling", difficulty: "Dễ",
-    stem: "User hỏi LLM: “Thời tiết Hà Nội hiện tại thế nào?” Tại sao hệ thống có weather tool nên gọi tool thay vì chỉ dựa vào model knowledge?",
-    options: {
-      A: "LLM không hiểu khái niệm thời tiết",
-      B: "Tool có thể cung cấp dữ liệu hiện tại mà knowledge trong model không đảm bảo cập nhật",
-      C: "Tool làm LLM có nhiều parameter hơn",
-      D: "Tool làm context window lớn hơn"
+    "id": "Q12",
+    "topic": "model selection",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Tier nào phù hợp nhất: input 90k token, output cap 8k, reasoning vừa, budget hạn chế?\n\nBối cảnh: Tier S: 32k context, rẻ/nhanh; Tier M: 128k context, reasoning tốt, giá vừa; Tier L: reasoning mạnh nhất, đắt/chậm.",
+    "options": {
+      "A": "Tier S",
+      "B": "Tier M",
+      "C": "Tier L",
+      "D": "Không tier nào"
     },
-    correct: "B",
-    reference: {
-      nonit: "Hỏi LLM thời tiết hiện tại mà không cho nó kiểm tra nguồn mới giống như hỏi một người dựa vào bản tin họ đã xem từ trước. Tool cho AI khả năng kiểm tra tình hình hiện tại.",
-      dev: "LLM nhận intent, application dispatch weather API rồi đưa tool response trở lại context. Current state được lấy từ external service thay vì model weights.",
-      dataai: "Model parameters chứa learned knowledge chứ không phải guaranteed real-time state. Tool augmentation cung cấp external observation tại inference time để ground factual response."
+    "correct": "B",
+    "reference": {
+      "nonit": "Tier S không đủ context cho input 90k. Tier M có context 128k, reasoning phù hợp và chi phí thấp hơn Tier L. Theo profile giả định của đề, M là lựa chọn phù hợp nhất.",
+      "dev": "Tier S không đủ context cho input 90k. Tier M có context 128k, reasoning phù hợp và chi phí thấp hơn Tier L. Theo profile giả định của đề, M là lựa chọn phù hợp nhất.",
+      "dataai": "Tier S không đủ context cho input 90k. Tier M có context 128k, reasoning phù hợp và chi phí thấp hơn Tier L. Theo profile giả định của đề, M là lựa chọn phù hợp nhất."
     },
-    anchors: [
-      { code: "T03-034", quote: "Khi detect được người dùng hỏi đếm số lượng chữ cái trong một từ, nó chỉ cần gọi một cái tool. Tool đấy viết bằng Python luôn." },
-      { code: "T06-148", quote: "Bất lợi đầu tiên là knowledge cutoff: bao giờ nó cũng có cái mốc chặn trên về mặt tri thức." }
-    ],
-    anchor_confidence: "strong",
-    concept: { title: "Tool calling để lấy dữ liệu hiện tại", summary: "Kiến thức trong mô hình là tĩnh và có thể cũ. Khi cần thông tin thời gian thực hoặc phép tính chính xác, hệ thống nên gọi công cụ bên ngoài rồi đưa kết quả vào ngữ cảnh.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "model selection",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q13", topic: "RAG vs Agent", difficulty: "Khó",
-    stem: "Hệ thống A: Question → Retrieve document → Generate answer. Hệ thống B: Request → Check CRM → (thiếu thông tin? hỏi user / check calendar) → next action. Nhận định nào đúng nhất?",
-    options: {
-      A: "Cả hai đều bắt buộc là Agent",
-      B: "A có thể là RAG workflow cố định; B có tính agentic vì action tiếp theo phụ thuộc state và observation",
-      C: "RAG luôn phức tạp hơn Agent",
-      D: "Agent không thể sử dụng RAG"
+    "id": "Q13",
+    "topic": "agentic systems",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Ứng dụng nhận mục tiêu đặt lịch họp, kiểm tra lịch bốn người, đề xuất giờ, gửi lời mời qua tool và kiểm tra trạng thái. Hành vi nào mô tả đúng nhất?",
+    "options": {
+      "A": "Discriminative",
+      "B": "Chỉ là database query",
+      "C": "Agentic",
+      "D": "Chỉ generative"
     },
-    correct: "B",
-    reference: {
-      nonit: "A giống việc luôn làm ba bước cố định: nhận câu hỏi, mở sách, trả lời. B giống trợ lý phải xem tình hình sau mỗi bước rồi mới quyết định nên làm gì tiếp.",
-      dev: "A có static execution graph retrieve → generate. B có dynamic control flow, nơi tool result quyết định branch tiếp theo.",
-      dataai: "RAG augment generation bằng retrieved evidence. B thể hiện sequential decision-making vì a_{t+1} phụ thuộc observation o_t, nên có agentic closed-loop behavior."
+    "correct": "C",
+    "reference": {
+      "nonit": "Hệ thống nhận một mục tiêu và thực hiện nhiều bước, tương tác với tool và kiểm tra kết quả để hoàn thành mục tiêu. Vì vậy hành vi chính được mô tả là agentic.",
+      "dev": "Hệ thống nhận một mục tiêu và thực hiện nhiều bước, tương tác với tool và kiểm tra kết quả để hoàn thành mục tiêu. Vì vậy hành vi chính được mô tả là agentic.",
+      "dataai": "Hệ thống nhận một mục tiêu và thực hiện nhiều bước, tương tác với tool và kiểm tra kết quả để hoàn thành mục tiêu. Vì vậy hành vi chính được mô tả là agentic."
     },
-    anchors: [
-      { code: "T04-073", quote: "Đấy là con đường đi đến AI agent. Hiểu nôm na, nó không phải chỉ sinh văn bản nữa: nó có thể làm được việc." }
-    ],
-    anchor_confidence: "partial",
-    concept: { title: "Workflow cố định và hành vi agentic", summary: "Pipeline cố định (như RAG chuẩn) luôn chạy cùng một chuỗi bước. Hệ thống agentic chọn bước tiếp theo dựa trên trạng thái và kết quả vừa quan sát, nên luồng chạy có thể rẽ nhánh.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "agentic systems",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q14", topic: "Hallucination", difficulty: "Dễ",
-    stem: "LLM trả lời rất tự tin: “Theo báo cáo, doanh thu tăng 27%.” Nhưng source document không chứa con số 27%. Kết luận nào đúng?",
-    options: {
-      A: "Fluency và confidence trong cách diễn đạt không phải bằng chứng rằng factual claim được source hỗ trợ",
-      B: "LLM chỉ hallucinate khi temperature > 1",
-      C: "Model càng lớn thì không hallucinate",
-      D: "Chỉ cần dùng RAG là tự động loại bỏ hallucination"
+    "id": "Q14",
+    "topic": "problem discovery",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Stakeholder nói: “Hãy làm chatbot AI cho phòng nhân sự.” Câu viết lại nào là điểm bắt đầu discovery tốt nhất?",
+    "options": {
+      "A": "Chatbot AI sẽ giảm 70% công việc HR",
+      "B": "Nhân viên mới kẹt ở bước nào khi tìm policy, hậu quả và outcome là gì?",
+      "C": "Cần RAG và vector database cho mọi tài liệu HR",
+      "D": "Dùng model lớn nhất"
     },
-    correct: "A",
-    reference: {
-      nonit: "AI có thể nói sai bằng giọng rất chắc chắn, giống một người nhớ nhầm nhưng vẫn nói đầy tự tin. Muốn biết 27% đúng hay không phải kiểm tra nguồn.",
-      dev: "Generated output không phải source of truth. Application nên ground factual claims vào document/database/tool result và có thể thêm citation hoặc verification.",
-      dataai: "LLM tối ưu likelihood của token sequences chứ không trực tiếp tối ưu truth value của từng proposition. Fluent high-probability completion vẫn có thể unsupported by evidence."
+    "correct": "B",
+    "reference": {
+      "nonit": "Yêu cầu ban đầu chỉ nêu giải pháp. Discovery phải khôi phục actor, workflow, pain, outcome và vẫn để mở phương án không AI.",
+      "dev": "Yêu cầu ban đầu chỉ nêu giải pháp. Discovery phải khôi phục actor, workflow, pain, outcome và vẫn để mở phương án không AI.",
+      "dataai": "Yêu cầu ban đầu chỉ nêu giải pháp. Discovery phải khôi phục actor, workflow, pain, outcome và vẫn để mở phương án không AI."
     },
-    anchors: [
-      { code: "T06-138", quote: "LLM có thể sai, và trên thực tế không bao giờ có chuyện đúng 100%." },
-      { code: "T04-047", quote: "Nó không phải là nó biết cái tri thức đấy, mà là nó đang dự đoán những từ tiếp theo." }
-    ],
-    anchor_confidence: "strong",
-    concept: { title: "Tự tin không phải bằng chứng", summary: "LLM có thể diễn đạt trôi chảy, chắc chắn nhưng vẫn sai. Mọi con số, sự kiện cần được kiểm tra với nguồn; không dùng giọng điệu để đánh giá độ đúng.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "problem discovery",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q15", topic: "Prompt vs RAG vs Fine-tuning", difficulty: "Trung bình",
-    stem: "Bạn muốn: (1) Model luôn trả lời ngắn gọn. (2) Model dùng handbook mới nhất. (3) Model thích nghi sâu hơn với một dạng task chuyên biệt. Mapping nào hợp lý nhất?",
-    options: {
-      A: "Prompt → (1), RAG → (2), Fine-tuning → (3)",
-      B: "RAG → cả ba",
-      C: "Fine-tuning → (1), Prompt → (2), Tokenizer → (3)",
-      D: "Embedding → cả ba"
+    "id": "Q15",
+    "topic": "product iteration",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Ghép từng feedback sau test với bước sớm nhất cần quay lại.",
+    "options": {
+      "A": "Người dùng không gặp pain mà nhóm đã giả định → Define lại problem; Pain đúng nhưng họ cần cảnh báo theo nhóm thay vì từng cá nhân → Ideate lại cách giải; Luồng ý tưởng đúng nhưng nút xác nhận khiến họ gửi nhầm → Prototype/interaction",
+      "B": "Người dùng không gặp pain → Prototype; Pain đúng nhưng cách cảnh báo sai → Define problem; Nút xác nhận gây gửi nhầm → Pre-training",
+      "C": "Người dùng không gặp pain → Ideate; Pain đúng nhưng cách cảnh báo sai → Prototype; Nút xác nhận gây gửi nhầm → Define problem",
+      "D": "Cả ba feedback đều quay lại Define problem vì mọi lỗi sản phẩm đều bắt đầu từ problem"
     },
-    correct: "A",
-    reference: {
-      nonit: "Prompt giống hướng dẫn trước khi làm; RAG giống đưa tài liệu để tra; fine-tuning giống đào tạo thêm để AI quen với một công việc cụ thể.",
-      dev: "Prompt thay runtime instruction, RAG inject external knowledge vào request, còn fine-tuning update model weights từ training examples.",
-      dataai: "Đây tương ứng với in-context conditioning, non-parametric retrieval augmentation và parameter adaptation — ba cơ chế tác động lên model ở các lớp khác nhau."
+    "correct": "A",
+    "reference": {
+      "nonit": "Không có nhu cầu thì quay về problem; nhu cầu đúng nhưng cách giải sai thì quay về ideate; ma sát tương tác thì quay về prototype.",
+      "dev": "Không có nhu cầu thì quay về problem; nhu cầu đúng nhưng cách giải sai thì quay về ideate; ma sát tương tác thì quay về prototype.",
+      "dataai": "Không có nhu cầu thì quay về problem; nhu cầu đúng nhưng cách giải sai thì quay về ideate; ma sát tương tác thì quay về prototype."
     },
-    anchors: [
-      { code: "T03-119", quote: "Nếu đụng đến fine-tuning, đa phần là các bạn đang cố deploy hệ thống vào một lĩnh vực ngách rất đặc thù." }
-    ],
-    anchor_confidence: "partial",
-    concept: { title: "Prompt · RAG · Fine-tuning tác động ở ba lớp", summary: "Prompt điều chỉnh hành vi ngay trong lượt gọi; RAG đưa kiến thức bên ngoài vào ngữ cảnh; fine-tuning thay đổi trọng số để thích nghi sâu với một dạng việc.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "product iteration",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q16", topic: "Vector Database", difficulty: "Dễ",
-    stem: "Trong hệ thống RAG, vector database chủ yếu làm gì?",
-    options: {
-      A: "Sinh câu trả lời cuối cùng",
-      B: "Lưu và tìm các vector representation để retrieve những chunks gần với query theo similarity",
-      C: "Fine-tune LLM",
-      D: "Thay thế tokenizer"
+    "id": "Q16",
+    "topic": "AI system design",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Ghép từng yêu cầu với cơ chế chịu trách nhiệm trực tiếp nhất.",
+    "options": {
+      "A": "Diễn giải email tự do → LLM; Tính thuế theo công thức → Function deterministic; Lấy chính sách nội bộ mới nhất → Retrieval; Tìm tuyến giao hàng tối ưu → Optimizer/graph; Gửi lệnh đặt lịch → External tool/action",
+      "B": "Diễn giải email tự do → Function deterministic; Tính thuế theo công thức → LLM; Lấy chính sách mới nhất → Optimizer/graph; Tìm tuyến → Retrieval; Gửi lệnh → LLM",
+      "C": "Diễn giải email tự do → Retrieval; Tính thuế → External tool/action; Lấy chính sách → LLM; Tìm tuyến → Function deterministic; Gửi lệnh → Optimizer/graph",
+      "D": "Tất cả yêu cầu đều giao cho LLM để giảm số thành phần hệ thống"
     },
-    correct: "B",
-    reference: {
-      nonit: "Vector database giống thư viện sắp tài liệu theo mức độ “gần nhau về ý nghĩa”. Khi bạn hỏi, hệ thống tìm những đoạn có ý gần với câu hỏi.",
-      dev: "Pipeline thường là documents → chunks → embeddings → vector DB. Query cũng được embed rồi chạy nearest-neighbor search để retrieve top-k chunks.",
-      dataai: "Vector DB thực hiện nearest-neighbor retrieval trong embedding space dựa trên distance/similarity giữa query và document representations, có thể kết hợp filtering/reranking."
+    "correct": "A",
+    "reference": {
+      "nonit": "Mỗi requirement có failure mode và cơ chế phù hợp; LLM không nên giả lập tính toán, freshness hay side effect.",
+      "dev": "Mỗi requirement có failure mode và cơ chế phù hợp; LLM không nên giả lập tính toán, freshness hay side effect.",
+      "dataai": "Mỗi requirement có failure mode và cơ chế phù hợp; LLM không nên giả lập tính toán, freshness hay side effect."
     },
-    anchors: [],
-    anchor_confidence: "none",
-    concept: { title: "Vector database", summary: "Nơi lưu các vector embedding của từng đoạn tài liệu và tìm nhanh những đoạn gần nhất với câu hỏi theo độ tương đồng. Nó không sinh câu trả lời và không huấn luyện mô hình.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "AI system design",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q17", topic: "Chunking trong RAG", difficulty: "Trung bình",
-    stem: "Nếu một tài liệu 100 trang được đưa vào vector database dưới dạng một chunk duy nhất, vấn đề nào dễ xảy ra?",
-    options: {
-      A: "Retrieval khó xác định chính xác phần nhỏ liên quan và context đưa vào LLM có thể chứa nhiều thông tin thừa",
-      B: "Embedding không thể tạo từ văn bản dài",
-      C: "LLM tự động trở thành Agent",
-      D: "Vector database sẽ xóa tài liệu"
+    "id": "Q17",
+    "topic": "parallel workflows",
+    "difficulty": "Trung bình",
+    "question_type": "multi_select",
+    "stem": "Chọn tất cả thiết kế đúng cho ba phân tích độc lập Finance, Legal và Customer feedback, chỉ tổng hợp sau khi các nhánh hoàn tất.",
+    "options": {
+      "A": "Legal dùng kết quả Finance chưa hoàn thành nhưng vẫn gọi là song song",
+      "B": "Chạy ba phân tích song song nếu cùng nhận input đã chuẩn hóa",
+      "C": "Định nghĩa schema output chung cho aggregator",
+      "D": "Fan-out luôn giảm tổng token cost",
+      "E": "Quy định xử lý khi một nhánh timeout"
     },
-    correct: "A",
-    reference: {
-      nonit: "Giống như bạn muốn tìm một công thức nhưng hệ thống chỉ có thể đưa cho bạn cả cuốn sách 100 trang. Chia sách thành những đoạn hợp lý giúp tìm đúng phần cần đọc hơn.",
-      dev: "RAG thường chạy document → chunks → embeddings → vector DB → top-k. Chunk quá lớn khiến embedding đại diện nhiều nội dung và retrieved context chứa nhiều irrelevant text.",
-      dataai: "Chunk size tạo trade-off giữa retrieval granularity và semantic/context preservation. Large chunks có thể giảm discriminability và tăng context noise; quá nhỏ lại làm mất semantic dependencies."
+    "correct": "B, C, E",
+    "reference": {
+      "nonit": "Parallel branches phải độc lập, có contract và partial-failure policy; fan-out thường tăng tổng work/cost.",
+      "dev": "Parallel branches phải độc lập, có contract và partial-failure policy; fan-out thường tăng tổng work/cost.",
+      "dataai": "Parallel branches phải độc lập, có contract và partial-failure policy; fan-out thường tăng tổng work/cost."
     },
-    anchors: [
-      { code: "T04-052", quote: "Context rot: khi bạn càng đưa nhiều thông tin, càng đưa nhiều ngữ cảnh, thì cái mô hình càng ngày về sau nó sẽ càng kém đi." }
-    ],
-    anchor_confidence: "partial",
-    concept: { title: "Chunking: cắt tài liệu đúng cỡ", summary: "Tài liệu được cắt thành đoạn trước khi embed. Đoạn quá lớn khiến truy hồi kém chính xác và đưa nhiều nội dung thừa vào ngữ cảnh; quá nhỏ làm mất mạch ý.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "parallel workflows",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q18", topic: "Agent + Human Approval", difficulty: "Trung bình",
-    stem: "AI Agent có thể: Đọc invoice → kiểm tra thông tin → chuẩn bị payment → chuyển 50 triệu. Vì sao bước cuối có thể vẫn cần human approval?",
-    options: {
-      A: "Agent không gọi được API thanh toán",
-      B: "Action có hậu quả lớn hoặc khó đảo ngược nên mức autonomy phải phụ thuộc risk, không chỉ khả năng kỹ thuật của AI",
-      C: "LLM không xử lý được số",
-      D: "RAG không hỗ trợ payment"
+    "id": "Q18",
+    "topic": "graceful failure",
+    "difficulty": "Trung bình",
+    "question_type": "multi_select",
+    "stem": "Retrieval bị lỗi nhưng dữ liệu form người dùng đã nhập vẫn còn. Chọn tất cả phản hồi graceful failure phù hợp.",
+    "options": {
+      "A": "Xóa toàn bộ form để reset",
+      "B": "Dùng cache cũ nhưng gọi là mới",
+      "C": "Giữ form và nói rõ chưa lấy được nguồn",
+      "D": "Chuyển review thủ công nếu quyết định gấp",
+      "E": "Cho retry retrieval hoặc lưu nháp"
     },
-    correct: "B",
-    reference: {
-      nonit: "AI có thể chuẩn bị mọi thứ như một trợ lý kế toán, nhưng trước khi thực sự chuyển 50 triệu thì người chịu trách nhiệm vẫn nên kiểm tra và bấm xác nhận.",
-      dev: "Read-only operations có thể automated, nhưng side-effecting payment API nên nằm sau approval gate hiển thị recipient, amount và payload trước dispatch.",
-      dataai: "Model confidence không phải calibrated guarantee về action safety. Khi expected cost của false action cao, human-in-the-loop tạo control boundary trước irreversible action."
+    "correct": "C, D, E",
+    "reference": {
+      "nonit": "Failure được cô lập ở retrieval; user giữ work và có retry/save/handoff.",
+      "dev": "Failure được cô lập ở retrieval; user giữ work và có retry/save/handoff.",
+      "dataai": "Failure được cô lập ở retrieval; user giữ work và có retry/save/handoff."
     },
-    anchors: [
-      { code: "T06-138", quote: "LLM có thể sai, và trên thực tế không bao giờ có chuyện đúng 100%." }
-    ],
-    anchor_confidence: "partial",
-    concept: { title: "Mức tự động hoá theo rủi ro", summary: "Hành động khó đảo ngược hoặc hậu quả lớn nên có người phê duyệt, dù AI đủ khả năng kỹ thuật. Mức tự chủ được quyết bởi chi phí khi sai, không bởi năng lực mô hình.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "graceful failure",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q19", topic: "Model Evaluation", difficulty: "Trung bình",
-    stem: "Model A có benchmark tổng quát cao hơn Model B. Nhưng trên test set đại diện cho đúng workload production của ứng dụng, Model B tốt hơn rõ rệt. Nên hiểu kết quả thế nào?",
-    options: {
-      A: "Luôn chọn Model A vì benchmark tổng quát cao hơn",
-      B: "Evaluation trên workload đại diện cho use case thực tế quan trọng hơn việc chỉ nhìn aggregate benchmark",
-      C: "Luôn chọn model nhiều parameter hơn",
-      D: "Benchmark hoàn toàn không có giá trị"
+    "id": "Q19",
+    "topic": "operational design domain",
+    "difficulty": "Trung bình",
+    "question_type": "single_choice",
+    "stem": "Camera chỉ được validation ban ngày; ban đêm lux dưới ngưỡng. Hành động phù hợp nhất là gì?",
+    "options": {
+      "A": "Coi ban đêm là edge case đã đạt",
+      "B": "Tăng temperature",
+      "C": "Ngoài ODD: giảm chức năng hoặc bàn giao theo policy",
+      "D": "Tiếp tục tự động và bỏ cảnh báo"
     },
-    correct: "B",
-    reference: {
-      nonit: "Một người có điểm trung bình cao nhất không có nghĩa giỏi nhất đúng môn bạn cần. Nếu công việc của bạn rất cụ thể, nên kiểm tra khả năng trên chính công việc đó.",
-      dev: "Model selection nên benchmark trên representative production requests với cùng prompt, constraints và evaluation criteria. Generic leaderboard không đảm bảo application-level quality.",
-      dataai: "Aggregate benchmark có thể khác target task distribution và objective. Cần estimate expected performance trên representative target distribution và xem cả metric, variance, contamination hay domain shift."
+    "correct": "C",
+    "reference": {
+      "nonit": "Lux dưới phạm vi validation là out-of-ODD; hệ thống phải degrade/stop/handoff.",
+      "dev": "Lux dưới phạm vi validation là out-of-ODD; hệ thống phải degrade/stop/handoff.",
+      "dataai": "Lux dưới phạm vi validation là out-of-ODD; hệ thống phải degrade/stop/handoff."
     },
-    anchors: [],
-    anchor_confidence: "none",
-    concept: { title: "Đánh giá trên đúng workload", summary: "Điểm benchmark tổng quát không đảm bảo chất lượng cho bài toán cụ thể. Nên đo mô hình trên tập kiểm thử đại diện cho dữ liệu và yêu cầu thật của ứng dụng.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "operational design domain",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   },
   {
-    id: "Q20", topic: "LLM + RAG + Agent", difficulty: "Khó",
-    stem: "User yêu cầu: “Tìm chính sách nghỉ phép mới nhất, kiểm tra lịch của tôi tuần sau và nếu phù hợp thì tạo đơn nghỉ.” Architecture nào hợp lý nhất?",
-    options: {
-      A: "Chỉ sử dụng LLM",
-      B: "Chỉ sử dụng vector database",
-      C: "Agent điều phối workflow, dùng RAG để lấy chính sách mới nhất và dùng tool/API để kiểm tra lịch cũng như tạo đơn",
-      D: "Chỉ fine-tune model"
+    "id": "Q20",
+    "topic": "clinical AI evaluation",
+    "difficulty": "Trung bình",
+    "question_type": "multi_select",
+    "stem": "Hệ thống cảnh báo sepsis có human triage; bỏ sót ca bệnh nguy hiểm hơn cảnh báo giả. Chọn tất cả phát biểu phù hợp.",
+    "options": {
+      "A": "Recall 100% luôn là cấu hình production đúng",
+      "B": "Threshold cuối phải test trong workflow triage thật",
+      "C": "Có lý do ưu tiên recall cao hơn",
+      "D": "Precision không còn cần đo",
+      "E": "False negative là lỗi cần theo dõi chặt"
     },
-    correct: "C",
-    reference: {
-      nonit: "Agent giống người trợ lý điều phối công việc: nó tra sổ chính sách mới nhất, xem lịch của bạn rồi mới tạo đơn. Mỗi thành phần AI đảm nhiệm một phần khác nhau.",
-      dev: "User → Agent/LLM → RAG(policy) → Calendar API → Leave API. Agent quản lý control flow, RAG cung cấp knowledge và APIs cung cấp external state/action.",
-      dataai: "Đây là retrieval-augmented agentic system. Retrieval cung cấp external evidence, tool observations cập nhật state, còn agent policy quyết định action tiếp theo cho tới completion condition."
+    "correct": "B, C, E",
+    "reference": {
+      "nonit": "Chi phí false negative cao ủng hộ việc ưu tiên recall, nhưng precision và burden của triage vẫn phải đo; không có cấu hình tuyệt đối.",
+      "dev": "Chi phí false negative cao ủng hộ việc ưu tiên recall, nhưng precision và burden của triage vẫn phải đo; không có cấu hình tuyệt đối.",
+      "dataai": "Chi phí false negative cao ủng hộ việc ưu tiên recall, nhưng precision và burden của triage vẫn phải đo; không có cấu hình tuyệt đối."
     },
-    anchors: [
-      { code: "T04-073", quote: "Nó cần được gắn tay, gắn chân — kết nối với các công cụ, với thế giới bên ngoài." },
-      { code: "T03-036", quote: "Dùng RAG cho một vài cái system nó tốt." }
-    ],
-    anchor_confidence: "partial",
-    concept: { title: "Ghép LLM, RAG và agent", summary: "Agent điều phối các bước, RAG cung cấp kiến thức cập nhật, công cụ/API cung cấp trạng thái và hành động bên ngoài. Mỗi thành phần giải quyết một phần của yêu cầu phức tạp.", draft: true }
+    "anchors": [],
+    "anchor_confidence": "none",
+    "concept": {
+      "title": "clinical AI evaluation",
+      "summary": "Nội dung quiz được tích hợp từ bộ câu hỏi AI track; chưa gắn với đoạn transcript cụ thể.",
+      "draft": false
+    }
   }
 ];

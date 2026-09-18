@@ -5,3 +5,6 @@ codebase/server/.env
 node_modules/
 .DS_Store
 Thumbs.db
+.env
+codebase/server/.env
+codebase/server/logs/*.jsonl
