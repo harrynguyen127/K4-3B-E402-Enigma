@@ -18,7 +18,7 @@
       <h1>Cùng một câu hỏi, cùng một đáp án đúng — lời giảng theo đúng hồ sơ của bạn</h1>
     </div>
     <div class="actions">
-      <button class="mode-badge mock" id="mode-badge" title="Xem cấu hình AI"><span class="dot"></span><span id="mode-label">DEMO · đang kiểm tra bộ nhớ AI…</span></button>
+      <button class="mode-badge mock" id="mode-badge" title="Xem cấu hình AI"><span class="dot"></span><span id="mode-label">AI · đang chuẩn bị nội dung…</span></button>
       <button class="btn ghost" id="btn-settings" title="Cài đặt AI">⚙</button>
     </div>
   </div>
@@ -26,7 +26,7 @@
   <!-- ===== TABS ===== -->
   <nav class="tabs" id="tabs" role="tablist" aria-label="Chế độ xem">
     <button class="tab" role="tab" id="tab-btn-info" data-tab="info" aria-controls="tab-info" aria-selected="true">Thông tin</button>
-    <button class="tab" role="tab" id="tab-btn-demo" data-tab="demo" aria-controls="tab-demo" aria-selected="false">Live demo</button>
+    <button class="tab" role="tab" id="tab-btn-demo" data-tab="demo" aria-controls="tab-demo" aria-selected="false">Luyện tập</button>
     <button class="tab" role="tab" id="tab-btn-tech" data-tab="tech" aria-controls="tab-tech" aria-selected="false">Tech <span id="trace-count" class="small">(0)</span></button>
   </nav>
 
@@ -59,13 +59,13 @@
       </div>
     </div>
     <div class="row intro-foot">
-      <button class="btn primary" id="btn-go-demo">Thử ngay ở tab Live demo →</button>
+      <button class="btn primary" id="btn-go-demo">Bắt đầu luyện tập →</button>
       <span class="small">Chọn hồ sơ, làm câu 7 (temperature), trả lời sai rồi xem lời giải thích. Bấm "So sánh với hồ sơ khác" để thấy cùng đáp án nhưng khác cách giảng.</span>
     </div>
   </section>
   </div>
 
-  <!-- ===== TAB 2: LIVE DEMO ===== -->
+  <!-- ===== TAB 2: LUYỆN TẬP ===== -->
   <div class="tab-panel" id="tab-demo" role="tabpanel" aria-labelledby="tab-btn-demo" hidden>
 
   <!-- ===== BỘ NHỚ AI: tiến độ sinh lần đầu / cảnh báo (nội dung trong app.js → renderMemoryStatus) ===== -->
@@ -168,6 +168,7 @@
         <div class="label">Nguồn trích dẫn</div>
         <div class="small" id="sb-anchors">Chọn câu hỏi để xem AI được phép trích dẫn đoạn nào.</div>
       </div>
+      <div class="sb-card evidence-viewer" id="sb-evidence-viewer" hidden></div>
     </aside>
   </div>
   </div>
@@ -175,18 +176,18 @@
   <!-- ===== TAB 3: TECH ===== -->
   <div class="tab-panel" id="tab-tech" role="tabpanel" aria-labelledby="tab-btn-tech" hidden>
 
-    <!-- BỘ NHỚ AI: sinh một lần bằng model thật → lưu → demo chỉ đọc lại (không gọi API khi trả lời). Bảng log: model, prompt, token, chi phí. -->
+    <!-- KHU VỰC CHẠY AI: chạy theo từng câu hoặc toàn bộ câu đã chọn. Bảng log: model, prompt, token, chi phí. -->
     <section class="card pad stack livegen" id="sec-livegen">
       <div class="livegen-head">
         <div>
-          <div class="label">Bộ nhớ AI · sinh một lần, dùng lại <span class="tour-tag d2">D2</span></div>
-          <h2 style="font-size:22px;margin-top:4px;">Tạo gợi ý và lời giải theo 3 hồ sơ cho cả bộ câu hỏi demo</h2>
-          <div class="small">Lần đầu vào Live demo mà bộ nhớ còn trống (hoặc khi bấm nút bên phải), hệ thống gọi model thật cho từng câu × hồ sơ × đáp án, rồi lưu vào file cache trên server (model chọn ở khung bên dưới) và bản sao trong trình duyệt. Từ đó, chọn đáp án, Kiểm tra và xem gợi ý chỉ đọc bộ nhớ, <b>không gọi API AI nào</b>. Mỗi lời gọi ghi một dòng vào bảng log bên dưới: model, system prompt, prompt, phản hồi, token, chi phí.</div>
+          <div class="label">Chạy AI theo câu hỏi <span class="tour-tag d2">D2</span></div>
+          <h2 style="font-size:22px;margin-top:4px;">Chạy gợi ý và lời giải theo 3 hồ sơ</h2>
+          <div class="small">Chọn chạy một câu để tiết kiệm lượt gọi, hoặc chủ động chạy toàn bộ các câu đã chọn. Kết quả được lưu cache và ghi lại trong bảng log bên dưới.</div>
           <div class="small" id="memory-status" style="margin-top:6px;"></div>
         </div>
         <div class="row livegen-actions">
-          <button class="btn primary" id="btn-memory-gen" title="Chỉ sinh các mục còn thiếu; bộ nhớ đã đủ thì không gọi model">Tạo câu gợi ý cho bộ câu hỏi</button>
-          <button class="btn" id="btn-memory-regen" title="Gọi lại model cho toàn bộ mục, bỏ qua cache (tốn phí)">Tạo lại toàn bộ…</button>
+          <button class="btn primary" id="btn-memory-gen" title="Chạy AI cho tất cả câu hỏi đã chọn">Chạy tất cả câu đã chọn</button>
+          <button class="btn" id="btn-memory-regen" title="Chạy lại AI cho toàn bộ câu hỏi đã chọn, bỏ qua cache">Chạy lại tất cả…</button>
         </div>
       </div>
       <div class="qpick" id="sec-qpick">
@@ -194,7 +195,7 @@
           <div>
             <div class="label">Chọn câu hỏi để tạo lời giải</div>
             <div class="qpick-count" id="qpick-count"></div>
-            <div class="small">Tick các câu muốn demo/test. Live demo chỉ dùng các câu đã chọn. Bấm <b>Tạo</b> ở từng câu để chỉ gọi model cho câu đó, hoặc dùng nút "Tạo câu gợi ý" phía trên để sinh cho tất cả câu đã chọn (chỉ mục còn thiếu).</div>
+            <div class="small">Chọn các câu muốn luyện tập. Bấm <b>Chạy câu này</b> để chỉ gọi AI cho một câu, hoặc dùng nút phía trên để chạy toàn bộ các câu đã chọn.</div>
           </div>
           <div class="qpick-tools">
             <div class="qpick-n"><input type="number" id="qcount" min="1" max="20" step="1" value="3" aria-label="Số câu đầu"><button class="btn" id="btn-qpick-n">Chọn N câu đầu</button></div>
@@ -213,7 +214,7 @@
           <button class="btn primary" id="btn-mp-apply">Áp dụng</button>
         </div>
         <div class="small" id="mp-status">Đang đọc danh sách provider…</div>
-        <div class="small">Đổi có hiệu lực ngay trên server, không cần restart. API key <b>không</b> nhập ở đây: đặt trong <code>server/.env</code> (<code>ANTHROPIC_API_KEY</code>, <code>GEMINI_API_KEY</code>…) rồi restart server một lần. Bộ nhớ AI được lưu riêng theo từng provider + model: đổi model thì cần tạo bộ nhớ mới, quay lại model cũ vẫn dùng lại bản đã sinh.</div>
+        <div class="small">Đổi có hiệu lực ngay trên server, không cần restart. API key <b>không</b> nhập ở đây: đặt trong <code>server/.env</code> (<code>DEEPSEEK_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>GEMINI_API_KEY</code>…) rồi restart server một lần. Bộ nhớ AI được lưu riêng theo từng provider + model: đổi model thì cần tạo bộ nhớ mới, quay lại model cũ vẫn dùng lại bản đã sinh.</div>
       </div>
       <div class="livegen-config" id="livegen-config"></div>
       <div class="livegen-progress" id="livegen-progress" hidden></div>
@@ -268,7 +269,7 @@
 <div class="modal-bg" id="modal">
   <div class="modal">
     <h3 style="font-size:22px;">Cài đặt lời gọi AI</h3>
-    <label class="radio-row on" id="rr-mock"><input type="radio" name="prov" value="mock" checked><div><b>DEMO (mặc định)</b> — nút "Kiểm tra" không gọi API AI; chẩn đoán, gợi ý và giải thích đọc từ bộ nhớ AI (sinh một lần bằng model thật, lưu ở server và trình duyệt). Mục chưa có trong bộ nhớ dùng lời giải mẫu của nhóm (<code>data.questions.js</code>). Không tốn phí lúc trả lời.</div></label>
+    <label class="radio-row on" id="rr-mock"><input type="radio" name="prov" value="mock" checked><div><b>OFFLINE (mặc định)</b> — nút "Kiểm tra" dùng nội dung đã chuẩn bị theo câu hỏi, hồ sơ học viên và grounding. Kết quả được lưu ở server và trình duyệt để các lượt luyện tập nhất quán.</div></label>
     <label class="radio-row" id="rr-live"><input type="radio" name="prov" value="live"><div><b>LIVE</b> — hint và explanation được sinh trực tiếp bởi model cấu hình trong <code>server/.env</code> (mặc định Claude qua Anthropic API; có thể đổi sang Ollama local). Chỉ dùng khi cần test pipeline thật.</div></label>
     <div>
       <div class="label">Endpoint server (chỉ dùng khi chọn LIVE)</div>

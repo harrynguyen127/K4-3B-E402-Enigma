@@ -5,6 +5,7 @@
  * Provider chọn qua AI_PROVIDER trong codebase/server/.env:
  *   anthropic  → Claude qua Anthropic API (SDK @anthropic-ai/sdk, cần npm install)
  *   gemini     → Google Gemini generateContent (fetch thuần, GEMINI_API_KEY)
+ *   deepseek   → DeepSeek Chat Completions (fetch thuần, DEEPSEEK_API_KEY)
  *   openrouter → OpenRouter Chat Completions (fetch thuần)
  *   ollama     → model local qua Ollama (fetch thuần)
  *   mock       → smoke test / offline, không gọi model
@@ -39,6 +40,13 @@ const PROVIDERS = {
       { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash", price: "chưa có bảng giá" }
     ]
   },
+  deepseek: {
+    label: "DeepSeek", key_env: ["DEEPSEEK_API_KEY"], default_model: "deepseek-chat",
+    models: [
+      { id: "deepseek-chat", label: "DeepSeek Chat", price: "theo bảng giá DeepSeek" },
+      { id: "deepseek-reasoner", label: "DeepSeek Reasoner", price: "theo bảng giá DeepSeek" }
+    ]
+  },
   openrouter: {
     label: "OpenRouter", key_env: ["OPENROUTER_API_KEY"], default_model: "openrouter/free",
     models: [{ id: "openrouter/free", label: "openrouter/free", price: "miễn phí" }]
@@ -48,7 +56,7 @@ const PROVIDERS = {
     models: [{ id: "qwen2.5:7b", label: "qwen2.5:7b", price: "local" }]
   }
 };
-const MODEL_ENV = { anthropic: ["ANTHROPIC_MODEL", ANTHROPIC_DEFAULT_MODEL], gemini: ["GEMINI_MODEL", GEMINI_DEFAULT_MODEL], openrouter: ["OPENROUTER_MODEL", "openrouter/free"], ollama: ["OLLAMA_MODEL", "qwen2.5:7b"] };
+const MODEL_ENV = { anthropic: ["ANTHROPIC_MODEL", ANTHROPIC_DEFAULT_MODEL], gemini: ["GEMINI_MODEL", GEMINI_DEFAULT_MODEL], deepseek: ["DEEPSEEK_MODEL", "deepseek-chat"], openrouter: ["OPENROUTER_MODEL", "openrouter/free"], ollama: ["OLLAMA_MODEL", "qwen2.5:7b"] };
 
 let runtime = { provider: null, model: null };
 
@@ -114,9 +122,10 @@ async function callModel({ system, user, mode }) {
 
   if (provider === "anthropic") return anthropic({ system, user, mode });
   if (provider === "gemini") return gemini({ system, user });
+  if (provider === "deepseek") return deepSeek({ system, user });
   if (provider === "openrouter") return openRouter({ system, user });
   if (provider === "ollama") return ollama({ system, user });
-  throw modelError(`AI_PROVIDER="${provider}" chưa được hỗ trợ. Dùng anthropic, gemini, openrouter, ollama hoặc mock.`, 501);
+  throw modelError(`AI_PROVIDER="${provider}" chưa được hỗ trợ. Dùng anthropic, gemini, deepseek, openrouter, ollama hoặc mock.`, 501);
 }
 
 function modelError(message, status) {
@@ -309,6 +318,26 @@ async function openRouter({ system, user }) {
     body: JSON.stringify({ model, messages: [{ role: "system", content: system }, { role: "user", content: user }], temperature: 0.2, max_tokens: 900, response_format: { type: "json_object" } })
   }, "OpenRouter");
   return ensureContent(body?.choices?.[0]?.message?.content, "OpenRouter");
+}
+
+async function deepSeek({ system, user }) {
+  const key = String(process.env.DEEPSEEK_API_KEY || "").trim();
+  if (!key) throw modelError("Thiếu DEEPSEEK_API_KEY trong codebase/server/.env.", 501);
+  const model = activeModel("deepseek");
+  const body = await fetchJson("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ model, messages: [{ role: "system", content: system }, { role: "user", content: user }], temperature: 0.2, max_tokens: Number(process.env.DEEPSEEK_MAX_TOKENS || 1800), response_format: { type: "json_object" } })
+  }, "DeepSeek");
+  lastUsage = {
+    model,
+    input_tokens: body?.usage?.prompt_tokens,
+    output_tokens: body?.usage?.completion_tokens,
+    cache_read_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+    stop_reason: body?.choices?.[0]?.finish_reason || null
+  };
+  return ensureContent(body?.choices?.[0]?.message?.content, "DeepSeek");
 }
 
 async function ollama({ system, user }) {

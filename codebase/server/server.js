@@ -20,6 +20,9 @@ const path = require("path");
 const { buildPrompt, SYSTEM, HINT_SYSTEM, PROMPT_VERSION } = require("./prompt");
 const { callModel, parseModelJson, appendLog, lastModelUsage, estimateCost, activeProvider, activeModel, activeScope, getRuntime, setRuntime, resetRuntime, listProviders, providerHasKey, geminiBase } = require("./model");
 const { retrieveAnchors, retrievalStatus } = require("./retrieval");
+const { getEvidence, readSlideImage } = require("./evidence");
+
+function promptCacheScope() { return `${activeScope()}|prompt:${PROMPT_VERSION}`; }
 const cache = require("./cache");
 
 const ROOT = path.resolve(__dirname, "..");           // codebase/
@@ -49,6 +52,13 @@ function generationMetadata(provider = activeProvider()) {
     model: activeModel("gemini"),
     endpoint: `${geminiBase()}/v1beta/models/${activeModel("gemini")}:generateContent`,
     effort: null, thinking: "mặc định của model", output_format: "application/json (JSON mode, không ép schema)",
+    personalization: PERSONA_NOTE, local: false
+  };
+  if (provider === "deepseek") return {
+    provider: "DeepSeek", api: "DeepSeek Chat Completions API",
+    model: activeModel("deepseek"),
+    endpoint: "https://api.deepseek.com/chat/completions",
+    effort: null, thinking: "không", output_format: "json_object",
     personalization: PERSONA_NOTE, local: false
   };
   if (provider === "ollama") return {
@@ -100,6 +110,14 @@ function fallbackExplanation(req, correct) {
 function attachTranscriptEvidence(request) {
   const q = request?.question;
   if (!q) return;
+  const evidence = getEvidence(q.id);
+  if (evidence) {
+    q.evidence = evidence;
+    q.anchors = evidence.anchors;
+    q.anchor_confidence = evidence.anchors.some(a => a.confidence === "strong") ? "strong" : "partial";
+    q.evidence_origin = "curated_evidence_map";
+    return;
+  }
   // Curated anchors always win. Automatic retrieval is deterministic and
   // deliberately independent of persona and learner answer.
   if ((!Array.isArray(q.anchors) || q.anchors.length === 0) && process.env.RETRIEVAL_DISABLED !== "1") {
@@ -122,6 +140,7 @@ function normalizeResponse(model, req) {
     followup_answer: null, probe_result: null,
     safety: { refused: false, reason: null }
   }, model && typeof model === "object" ? model : {});
+  out.evidence = req.question?.evidence || null;
   out.safety = Object.assign({ refused: false, reason: null }, out.safety || {});
 
   if (req.mode === "hint") {
@@ -227,7 +246,7 @@ const server = http.createServer(async (req, res) => {
     attachTranscriptEvidence(request);
     const prompt = buildPrompt(request);
     const provider = activeProvider();
-    const key = cache.cacheKey(request, activeScope());
+    const key = cache.cacheKey(request, promptCacheScope());
     const hit = noCache ? null : cache.get(key);
     if (hit) {
       // Kết quả sinh sẵn: không gọi model. Vẫn ghi log để trace/eval biết đây là bản cache.
@@ -288,7 +307,7 @@ const server = http.createServer(async (req, res) => {
   // Bộ nhớ AI cho UI: đọc file cache (không gọi model). ?questions=Q01,Q02 để lọc theo câu.
   if (req.method === "GET" && (req.url === "/api/memory" || req.url.startsWith("/api/memory?"))) {
     const ids = (new URL(req.url, "http://localhost").searchParams.get("questions") || "").split(",").map(s => s.trim()).filter(Boolean);
-    return json(res, 200, cache.slim(ids, activeScope()));
+    return json(res, 200, cache.slim(ids, promptCacheScope()));
   }
 
   // Danh sách provider + model preset + trạng thái key (chỉ true/false, không lộ key).
@@ -303,12 +322,25 @@ const server = http.createServer(async (req, res) => {
     if (!cfg || typeof cfg !== "object") return json(res, 400, { error: "Body không hợp lệ" });
     try {
       const active = cfg.reset ? resetRuntime() : setRuntime(cfg.provider, cfg.model);
-      return json(res, 200, { active, configured: providerConfigured(), scope: activeScope(), generation: generationMetadata() });
+      return json(res, 200, { active, configured: providerConfigured(), scope: promptCacheScope(), generation: generationMetadata() });
     } catch (e) { return json(res, e.status || 400, { error: e.message }); }
   }
 
   if (req.method === "GET" && req.url === "/api/health") {
-    return json(res, 200, { ok: true, provider: activeProvider() || null, model: activeModel() || null, scope: activeScope(), configured: providerConfigured(), generation: generationMetadata(), retrieval: retrievalStatus(), cache: cache.status() });
+    return json(res, 200, { ok: true, provider: activeProvider() || null, model: activeModel() || null, scope: promptCacheScope(), configured: providerConfigured(), generation: generationMetadata(), retrieval: retrievalStatus(), cache: cache.status() });
+  }
+
+  if (req.method === "GET" && req.url.startsWith("/api/evidence/slide/")) {
+    const parts = req.url.split("/");
+    const file = readSlideImage(parts[4], parts[5]);
+    if (!file) { res.writeHead(404); return res.end("Not found"); }
+    res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=3600" });
+    return fs.createReadStream(file).pipe(res);
+  }
+
+  if (req.method === "GET" && req.url.startsWith("/api/evidence?")) {
+    const id = new URL(req.url, "http://localhost").searchParams.get("question");
+    return json(res, 200, getEvidence(id));
   }
 
   // static

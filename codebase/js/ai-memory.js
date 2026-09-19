@@ -121,6 +121,11 @@
       if (prev !== j.scope) { reset = Object.keys(m).length > 0; mem = {}; m = mem; }
       memScope = j.scope; added++;
     }
+    // Server là nguồn sự thật: nếu người dùng đã xoá toàn bộ cache ở server,
+    // không giữ lại bản sao cũ trong localStorage dù scope vẫn giống nhau.
+    if (j.scope === memScope && Object.keys(j.entries || {}).length === 0 && Object.keys(m).length > 0) {
+      mem = {}; m = mem; reset = true; added++;
+    }
     for (const [k, e] of Object.entries(j.entries || {})) {
       if (!e || !e.parsed) continue;
       const cur = m[k];

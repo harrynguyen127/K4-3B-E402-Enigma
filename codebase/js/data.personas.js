@@ -6,8 +6,8 @@ window.PERSONAS = {
     key: "nonit",
     name: "Non-IT",
     short: "Business / vận hành / không code",
-    badge: "Ví dụ đời thường, không thuật ngữ",
-    style: "Người học không có nền tảng lập trình. Dùng ví dụ đời thường hoặc quy trình công việc (sổ tay, nhân viên mới, bàn làm việc). KHÔNG dùng công thức, ký hiệu toán, tên API. Nếu bắt buộc dùng thuật ngữ tiếng Anh thì giải thích ngay trong ngoặc.",
+    badge: "Định nghĩa rõ, không ẩn dụ",
+    style: "Người học không có nền tảng lập trình. Bắt đầu bằng định nghĩa thuật ngữ và điều kiện cốt lõi bằng tiếng Việt rõ ràng; dùng trực tiếp dữ kiện trong câu hỏi, không dùng ẩn dụ hoặc tình huống tưởng tượng. Không dùng công thức, ký hiệu toán hay tên API nếu không cần. Nếu bắt buộc dùng thuật ngữ tiếng Anh thì giải thích ngay trong ngoặc.",
     clarifier_option: "Tôi làm nghiệp vụ / vận hành / kinh doanh, hầu như không viết code."
   },
   dev: {
